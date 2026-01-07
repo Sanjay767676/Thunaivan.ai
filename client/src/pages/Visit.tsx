@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { useAnalyzeWebsite, useChat } from "@/hooks/use-thunaivan";
+import { useChat } from "@/hooks/use-thunaivan";
 import { AssistantAvatar } from "@/components/AssistantAvatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,13 +24,12 @@ import { clsx } from "clsx";
 type Message = {
   role: "user" | "assistant";
   content: string;
-  sources?: ChatResponse["sources"];
 };
 
 export default function Visit() {
   const [location, setLocation] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
-  const targetUrl = searchParams.get("url");
+  const pdfId = searchParams.get("pdfId");
 
   // State
   const [status, setStatus] = useState<"idle" | "analyzing" | "ready" | "error">("idle");
@@ -38,15 +37,16 @@ export default function Visit() {
   const [inputValue, setInputValue] = useState("");
   const [extractedContent, setExtractedContent] = useState<string>(""); // In real app, API would return this
   const [assistantState, setAssistantState] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
+  const [conversationId, setConversationId] = useState<number | null>(null);
   
   // Hooks
-  const analyzeMutation = useAnalyzeWebsite();
   const chatMutation = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [pdfFilename, setPdfFilename] = useState<string>("PDF Document");
 
-  // Initial Analysis
+  // Initial Load - PDF is already analyzed
   useEffect(() => {
-    if (!targetUrl) {
+    if (!pdfId) {
       setLocation("/");
       return;
     }
@@ -55,33 +55,34 @@ export default function Visit() {
       setStatus("analyzing");
       setAssistantState("thinking");
 
-      analyzeMutation.mutate(
-        { url: targetUrl },
-        {
-          onSuccess: (data: any) => {
-            // NOTE: In a real implementation, the analyze endpoint might return 
-            // the full text or a summary. We'll simulate it for now if the API 
-            // message suggests success.
-            setStatus("ready");
-            setAssistantState("idle");
-            setExtractedContent("Content successfully extracted and indexed. Ask me anything about this page.");
-            
-            // Add initial greeting
-            setMessages([
-              { 
-                role: "assistant", 
-                content: `I've analyzed ${targetUrl}. I'm ready to answer your questions based on its content.` 
-              }
-            ]);
-          },
-          onError: () => {
-            setStatus("error");
-            setAssistantState("idle");
+      // PDF is already analyzed, create a conversation and load the chat interface
+      const pdfIdNum = parseInt(pdfId);
+      if (isNaN(pdfIdNum)) {
+        setStatus("error");
+        setAssistantState("idle");
+        return;
+      }
+
+      // Create a new conversation (you might want to create an API endpoint for this)
+      // For now, we'll use a temporary conversation ID
+      const tempConversationId = Date.now(); // Temporary ID
+      setConversationId(tempConversationId);
+
+      setTimeout(() => {
+        setStatus("ready");
+        setAssistantState("idle");
+        setExtractedContent("PDF successfully analyzed using multiple AI models. Ask me anything about this document.");
+        
+        // Add initial greeting
+        setMessages([
+          { 
+            role: "assistant", 
+            content: `I've analyzed your PDF document using multiple AI models (GPT-4, Claude, Grok, and Gemini) working together. I'm ready to answer your questions based on its content.` 
           }
-        }
-      );
+        ]);
+      }, 1000);
     }
-  }, [targetUrl, status, analyzeMutation, setLocation]);
+  }, [pdfId, status, setLocation]);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -98,14 +99,26 @@ export default function Visit() {
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
     setAssistantState("thinking");
 
+    if (!conversationId || !pdfId) {
+      return;
+    }
+
+    const pdfIdNum = parseInt(pdfId);
+    if (isNaN(pdfIdNum)) {
+      return;
+    }
+
     chatMutation.mutate(
-      { message: userMessage },
+      { 
+        message: userMessage,
+        conversationId: conversationId,
+        pdfId: pdfIdNum
+      },
       {
         onSuccess: (data) => {
           setMessages(prev => [...prev, { 
             role: "assistant", 
-            content: data.answer,
-            sources: data.sources
+            content: data.answer
           }]);
           setAssistantState("speaking");
           
@@ -134,7 +147,7 @@ export default function Visit() {
           <AssistantAvatar state="thinking" size="lg" />
           <div className="space-y-2">
             <h2 className="text-2xl font-display font-bold">Analyzing Content</h2>
-            <p className="text-muted-foreground animate-pulse">Reading and indexing data from {targetUrl}...</p>
+            <p className="text-muted-foreground animate-pulse">Processing PDF document with multiple AI models...</p>
           </div>
           <div className="w-full max-w-xs space-y-3">
             <Skeleton className="h-2 w-full bg-slate-200 dark:bg-slate-700" />
@@ -181,9 +194,9 @@ export default function Visit() {
           </Button>
           
           <div>
-            <h1 className="font-display font-bold text-xl text-foreground">Content Viewer</h1>
-            <p className="text-xs text-muted-foreground truncate mt-1" title={targetUrl || ""}>
-              Source: {targetUrl}
+            <h1 className="font-display font-bold text-xl text-foreground">PDF Analysis</h1>
+            <p className="text-xs text-muted-foreground truncate mt-1" title={pdfFilename}>
+              Document: {pdfFilename}
             </p>
           </div>
 
@@ -220,6 +233,11 @@ export default function Visit() {
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
+            <img 
+              src="/logo.jpg" 
+              alt="Thunaivan Logo" 
+              className="h-8 w-auto object-contain"
+            />
             <span className="font-bold">Thunaivan</span>
           </div>
           <AssistantAvatar state={assistantState} size="sm" className="w-10 h-10" />
@@ -261,17 +279,6 @@ export default function Visit() {
                       {msg.content}
                     </div>
 
-                    {/* Sources (only for assistant) */}
-                    {msg.sources && msg.sources.length > 0 && (
-                      <div className="mt-3 w-full space-y-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider pl-1">Sources Used</p>
-                        <div className="grid gap-2">
-                          {msg.sources.map((source, sIdx) => (
-                            <SourceCard key={sIdx} source={source} index={sIdx} />
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Avatar for User */}

@@ -1,32 +1,31 @@
 import { z } from 'zod';
-import { analyzeRequestSchema, chatRequestSchema, chatResponseSchema } from './schema';
 
 export const api = {
-  analyze: {
+  analyzePdf: {
     method: 'POST' as const,
-    path: '/api/analyze',
-    input: analyzeRequestSchema,
+    path: '/api/analyze-pdf',
+    input: z.object({ url: z.string(), filename: z.string() }),
     responses: {
-      200: z.object({ sessionId: z.number(), message: z.string() }),
+      200: z.object({ id: z.number(), summary: z.string() }),
       400: z.object({ message: z.string() })
     }
   },
   chat: {
     method: 'POST' as const,
     path: '/api/chat',
-    input: chatRequestSchema,
+    input: z.object({ message: z.string(), conversationId: z.number(), pdfId: z.number() }),
     responses: {
-      200: chatResponseSchema,
-      400: z.object({ message: z.string() }),
+      200: z.object({ answer: z.string(), eligibilityPrompt: z.string().optional() }),
       500: z.object({ message: z.string() })
     }
   },
   stt: {
     method: 'POST' as const,
     path: '/api/stt',
+    input: z.object({ audioBase64: z.string() }),
     responses: {
       200: z.object({ text: z.string() }),
-      400: z.object({ message: z.string() })
+      500: z.object({ message: z.string() })
     }
   }
 };
