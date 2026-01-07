@@ -1,27 +1,40 @@
+import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 
-// We don't need a database schema for this session-based RAG app,
-// but we define the API schemas here.
-
-export const analyzeRequestSchema = z.object({
-  url: z.string().url("Please enter a valid URL")
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
 });
 
-export const chatRequestSchema = z.object({
-  message: z.string().min(1, "Question cannot be empty"),
+export const pdfs = pgTable("pdfs", {
+  id: serial("id").primaryKey(),
+  filename: text("filename").notNull(),
+  content: text("content").notNull(),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const sourceSchema = z.object({
-  text: z.string(),
-  relevance: z.number().optional()
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  pdfId: integer("pdf_id").references(() => pdfs.id),
+  title: text("title").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const chatResponseSchema = z.object({
-  answer: z.string(),
-  sources: z.array(sourceSchema)
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").references(() => conversations.id),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type AnalyzeRequest = z.infer<typeof analyzeRequestSchema>;
-export type ChatRequest = z.infer<typeof chatRequestSchema>;
-export type ChatResponse = z.infer<typeof chatResponseSchema>;
-export type Source = z.infer<typeof sourceSchema>;
+export const insertPdfSchema = createInsertSchema(pdfs).omit({ id: true, createdAt: true });
+export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true });
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
+
+export type Pdf = typeof pdfs.$inferSelect;
+export type Conversation = typeof conversations.$inferSelect;
+export type Message = typeof messages.$inferSelect;
