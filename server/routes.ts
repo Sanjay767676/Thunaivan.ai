@@ -10,7 +10,9 @@ import { eq } from "drizzle-orm";
 import { log } from "./index";
 
 const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
+const pdfParseModule = require('pdf-parse');
+// Handle both CommonJS and ES module exports
+const pdf = pdfParseModule.default || pdfParseModule;
 
 // Configure multer for file uploads
 const upload = multer({ 
@@ -51,20 +53,47 @@ export async function registerRoutes(
 
       // Analyze the PDF using AI (multi-model)
       log(`Analyzing PDF content with multiple AI models`);
-      const summary = await multiModelAnalyze(extractedText);
+      let summary: string;
+      try {
+        summary = await multiModelAnalyze(extractedText);
+        if (!summary || summary.trim().length === 0) {
+          summary = "PDF content extracted successfully. Analysis summary unavailable.";
+          log(`Warning: AI analysis returned empty summary`);
+        }
+      } catch (aiError: any) {
+        log(`AI analysis error: ${aiError.message}`);
+        summary = `PDF content extracted successfully. AI analysis encountered an error: ${aiError.message}. You can still ask questions about the document.`;
+      }
 
       // Store in database (using a placeholder URL for uploaded files)
-      const [pdfRecord] = await db.insert(pdfMetadata).values({
-        filename,
-        url: `uploaded://${filename}`, // Placeholder for uploaded files
-        extractedText,
-        analysisSummary: summary,
-      }).returning();
+      let pdfId: number;
+      if (db) {
+        try {
+          const [pdfRecord] = await db.insert(pdfMetadata).values({
+            filename,
+            url: `uploaded://${filename}`, // Placeholder for uploaded files
+            extractedText,
+            analysisSummary: summary,
+          }).returning();
 
-      log(`PDF analyzed and stored with ID: ${pdfRecord.id}`);
-      res.json({ id: pdfRecord.id, summary });
+          pdfId = pdfRecord.id;
+          log(`PDF analyzed and stored with ID: ${pdfId}`);
+        } catch (dbError: any) {
+          log(`Database error: ${dbError.message}. Using temporary ID.`);
+          // If database fails, use a temporary ID (timestamp-based)
+          pdfId = Date.now();
+          log(`Using temporary PDF ID: ${pdfId}`);
+        }
+      } else {
+        // No database connection - use temporary ID
+        pdfId = Date.now();
+        log(`No database connection. Using temporary PDF ID: ${pdfId}`);
+      }
+
+      res.json({ id: pdfId, summary });
     } catch (error: any) {
       log(`Error analyzing PDF: ${error.message}`);
+      console.error('Full error:', error);
       res.status(400).json({ message: error.message || "Failed to analyze PDF" });
     }
   });
@@ -79,41 +108,67 @@ export async function registerRoutes(
       }
 
       // Get PDF context
-      const [pdfRecord] = await db.select().from(pdfMetadata).where(eq(pdfMetadata.id, pdfId));
-      if (!pdfRecord) {
-        return res.status(404).json({ message: "PDF not found" });
+      let pdfRecord: any;
+      let context: string;
+      
+      if (!db) {
+        return res.status(500).json({ message: "Database not configured. Please set DATABASE_URL environment variable." });
+      }
+      
+      try {
+        const [record] = await db.select().from(pdfMetadata).where(eq(pdfMetadata.id, pdfId));
+        if (!record) {
+          return res.status(404).json({ message: "PDF not found in database. Please re-upload the PDF." });
+        }
+        pdfRecord = record;
+      } catch (dbError: any) {
+        log(`Database error when fetching PDF: ${dbError.message}`);
+        return res.status(500).json({ message: "Database connection error. Please ensure DATABASE_URL is set correctly." });
       }
 
       // Get conversation history
-      const conversationMessages = await db.select().from(messages)
-        .where(eq(messages.conversationId, conversationId))
-        .orderBy(messages.createdAt);
+      let conversationMessages: any[] = [];
+      try {
+        conversationMessages = await db.select().from(messages)
+          .where(eq(messages.conversationId, conversationId))
+          .orderBy(messages.createdAt);
+      } catch (dbError: any) {
+        log(`Database error when fetching messages: ${dbError.message}. Continuing without history.`);
+      }
 
       // Build context from PDF and conversation history
-      const context = `PDF Summary: ${pdfRecord.analysisSummary}\n\nExtracted Text: ${pdfRecord.extractedText.substring(0, 5000)}`;
+      context = `PDF Summary: ${pdfRecord.analysisSummary || 'No summary available'}\n\nExtracted Text: ${(pdfRecord.extractedText || '').substring(0, 5000)}`;
 
       // Get AI response
       log(`Getting AI response for chat message`);
       const answer = await getCombinedAnswer(message, context);
 
-      // Save user message
-      await db.insert(messages).values({
-        conversationId,
-        role: "user",
-        content: message,
-      });
+      // Save messages (optional - continue even if database fails)
+      if (db) {
+        try {
+          await db.insert(messages).values({
+            conversationId,
+            role: "user",
+            content: message,
+          });
 
-      // Save assistant message
-      await db.insert(messages).values({
-        conversationId,
-        role: "assistant",
-        content: answer,
-      });
+          await db.insert(messages).values({
+            conversationId,
+            role: "assistant",
+            content: answer,
+          });
+          log(`Chat response generated and saved`);
+        } catch (dbError: any) {
+          log(`Database error when saving messages: ${dbError.message}. Response still generated.`);
+        }
+      } else {
+        log(`Chat response generated (database not available, messages not saved)`);
+      }
 
-      log(`Chat response generated and saved`);
       res.json({ answer });
     } catch (error: any) {
       log(`Error in chat: ${error.message}`);
+      console.error('Full chat error:', error);
       res.status(500).json({ message: error.message || "Failed to get chat response" });
     }
   });

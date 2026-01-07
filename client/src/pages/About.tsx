@@ -42,7 +42,7 @@ export default function About() {
             whileTap={{ scale: 0.95 }}
           >
             <img 
-              src="/logo.jpg" 
+              src="/Logo.png" 
               alt="Thunaivan Logo" 
               className="h-10 w-auto object-contain"
             />

@@ -234,7 +234,7 @@ export default function Visit() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <img 
-              src="/logo.jpg" 
+              src="/Logo.png" 
               alt="Thunaivan Logo" 
               className="h-8 w-auto object-contain"
             />

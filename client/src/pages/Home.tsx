@@ -111,7 +111,7 @@ export default function Home() {
       <header className="w-full max-w-7xl mx-auto p-6 flex items-center justify-between relative z-10">
         <div className="flex items-center gap-2">
           <img 
-            src="/logo.jpg" 
+            src="/Logo.png" 
             alt="Thunaivan Logo" 
             className="h-10 w-auto object-contain"
           />
@@ -445,7 +445,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="w-full py-6 text-center text-sm text-slate-400 dark:text-slate-600 relative z-10">
-        <p>© 2024 Thunaivan AI. Powered by OpenAI & Replit.</p>
+        <p>© 2024 Thunaivan AI. Powered by Multi-Model AI.</p>
       </footer>
     </div>
   );
