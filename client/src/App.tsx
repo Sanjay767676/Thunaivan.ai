@@ -1,8 +1,12 @@
+import { useState, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { RegionProvider } from "@/contexts/RegionContext";
+import { SplashScreen } from "@/components/SplashScreen";
+import { RegionSelector } from "@/components/RegionSelector";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Visit from "@/pages/Visit";
@@ -24,11 +28,27 @@ function Router() {
 }
 
 function App() {
+  const [showSplash, setShowSplash] = useState(() => {
+    // Show splash only on first visit
+    return !sessionStorage.getItem("splashShown");
+  });
+
+  const handleSplashComplete = () => {
+    sessionStorage.setItem("splashShown", "true");
+    setShowSplash(false);
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <RegionProvider>
+          <Toaster />
+          {showSplash ? (
+            <SplashScreen onComplete={handleSplashComplete} />
+          ) : (
+            <Router />
+          )}
+        </RegionProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

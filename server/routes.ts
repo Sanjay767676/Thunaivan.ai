@@ -6,13 +6,16 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { pdfMetadata, conversations, messages, insertPdfMetadataSchema, insertMessageSchema } from "@shared/schema";
 import { extractPdfText, multiModelAnalyze, getCombinedAnswer, speechToText } from "./lib/ai-multi";
+import { processPdfForRag, queryPdfRag } from "./lib/pdf-rag";
 import { eq } from "drizzle-orm";
 import { log } from "./index";
 
+// Import pdf-parse - use require for CommonJS version
 const require = createRequire(import.meta.url);
+// pdf-parse exports an object with PDFParse function
 const pdfParseModule = require('pdf-parse');
-// Handle both CommonJS and ES module exports
-const pdf = pdfParseModule.default || pdfParseModule;
+// PDFParse is the actual function we need
+const pdf = pdfParseModule.PDFParse;
 
 // Configure multer for file uploads
 const upload = multer({ 
@@ -27,12 +30,15 @@ const upload = multer({
   }
 });
 
+// Import rate limiters from index
+import { aiRateLimiter, pdfRateLimiter } from "./index";
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   // POST /api/analyze-pdf - Analyze a PDF document (file upload)
-  app.post("/api/analyze-pdf", upload.single('pdf'), async (req: Request, res: Response) => {
+  app.post("/api/analyze-pdf", pdfRateLimiter, upload.single('pdf'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "PDF file is required" });
@@ -41,15 +47,28 @@ export async function registerRoutes(
       const filename = req.file.originalname;
       const fileBuffer = req.file.buffer;
 
-      log(`Extracting text from PDF: ${filename}`);
+      const fileSizeMB = (fileBuffer.length / 1024 / 1024).toFixed(2);
+      log(`Extracting text from PDF: ${filename} (${fileSizeMB} MB)`);
       
       // Extract text from PDF buffer
-      const pdfData = await pdf(fileBuffer);
+      // PDFParse v2 API: instantiate with { data: buffer } and call getText()
+      if (!pdf) {
+        throw new Error(`PDFParse not found. Available: ${Object.keys(pdfParseModule).join(', ')}`);
+      }
+      
+      // Create PDFParse instance with the buffer data
+      const pdfParser = new pdf({ data: fileBuffer });
+      const pdfData = await pdfParser.getText();
       const extractedText = pdfData.text;
 
       if (!extractedText || extractedText.trim().length === 0) {
         return res.status(400).json({ message: "PDF appears to be empty or unreadable" });
       }
+      
+      // Log extraction stats for large PDFs
+      const textLength = extractedText.length;
+      const estimatedPages = Math.ceil(textLength / 2500);
+      log(`PDF text extracted: ${textLength.toLocaleString()} characters (~${estimatedPages} pages)`);
 
       // Analyze the PDF using AI (multi-model)
       log(`Analyzing PDF content with multiple AI models`);
@@ -78,6 +97,11 @@ export async function registerRoutes(
 
           pdfId = pdfRecord.id;
           log(`PDF analyzed and stored with ID: ${pdfId}`);
+          
+          // Process PDF for RAG (async, don't wait)
+          processPdfForRag(pdfId, extractedText).catch((ragError: any) => {
+            log(`RAG processing error (non-critical): ${ragError.message}`);
+          });
         } catch (dbError: any) {
           log(`Database error: ${dbError.message}. Using temporary ID.`);
           // If database fails, use a temporary ID (timestamp-based)
@@ -95,6 +119,48 @@ export async function registerRoutes(
       log(`Error analyzing PDF: ${error.message}`);
       console.error('Full error:', error);
       res.status(400).json({ message: error.message || "Failed to analyze PDF" });
+    }
+  });
+
+  // POST /api/conversations - Create a new conversation for a PDF
+  app.post("/api/conversations", async (req: Request, res: Response) => {
+    try {
+      const { pdfId } = req.body;
+
+      if (!pdfId) {
+        return res.status(400).json({ message: "pdfId is required" });
+      }
+
+      if (!db) {
+        return res.status(500).json({ message: "Database not configured. Please set DATABASE_URL environment variable." });
+      }
+
+      // Verify PDF exists
+      try {
+        const [pdfRecord] = await db.select().from(pdfMetadata).where(eq(pdfMetadata.id, pdfId));
+        if (!pdfRecord) {
+          return res.status(404).json({ message: "PDF not found" });
+        }
+      } catch (dbError: any) {
+        log(`Database error when verifying PDF: ${dbError.message}`);
+        return res.status(500).json({ message: "Database connection error" });
+      }
+
+      // Create conversation
+      try {
+        const [conversation] = await db.insert(conversations).values({
+          pdfId: parseInt(pdfId),
+        }).returning();
+        
+        log(`Conversation created with ID: ${conversation.id}`);
+        res.json({ id: conversation.id });
+      } catch (dbError: any) {
+        log(`Database error when creating conversation: ${dbError.message}`);
+        res.status(500).json({ message: "Failed to create conversation" });
+      }
+    } catch (error: any) {
+      log(`Error creating conversation: ${error.message}`);
+      res.status(500).json({ message: error.message || "Failed to create conversation" });
     }
   });
 
@@ -136,8 +202,30 @@ export async function registerRoutes(
         log(`Database error when fetching messages: ${dbError.message}. Continuing without history.`);
       }
 
-      // Build context from PDF and conversation history
-      context = `PDF Summary: ${pdfRecord.analysisSummary || 'No summary available'}\n\nExtracted Text: ${(pdfRecord.extractedText || '').substring(0, 5000)}`;
+      // Use RAG to get only relevant chunks (reduces token usage significantly!)
+      try {
+        const ragResults = await queryPdfRag(pdfId, message, 5); // Get top 5 relevant chunks
+        const relevantChunks = ragResults.chunks.join('\n\n---\n\n');
+        const summary = pdfRecord.analysisSummary || 'No summary available';
+        
+        context = `PDF Summary: ${summary}\n\nRelevant sections from the document:\n${relevantChunks}`;
+        log(`Using RAG: Retrieved ${ragResults.chunks.length} relevant chunks (reduced from full ${pdfRecord.extractedText.length} chars)`);
+      } catch (ragError: any) {
+        // Fallback to full text if RAG fails
+        log(`RAG query failed: ${ragError.message}, using full text fallback`);
+        const fullText = pdfRecord.extractedText || '';
+        const textLength = fullText.length;
+        const contextLength = Math.min(textLength, 20000); // Reduced for Ollama
+        
+        let contextText = fullText;
+        if (textLength > contextLength) {
+          const beginning = fullText.substring(0, 10000);
+          const end = fullText.substring(textLength - 10000);
+          contextText = `${beginning}\n\n[... ${textLength - 20000} characters omitted ...]\n\n${end}`;
+        }
+        
+        context = `PDF Summary: ${pdfRecord.analysisSummary || 'No summary available'}\n\nDocument Text:\n${contextText}`;
+      }
 
       // Get AI response
       log(`Getting AI response for chat message`);

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Sparkles, Target, Users, Heart } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/Logo";
 
 const values = [
   {
@@ -41,14 +42,7 @@ export default function About() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <img 
-              src="/Logo.png" 
-              alt="Thunaivan Logo" 
-              className="h-10 w-auto object-contain"
-            />
-            <span className="font-display font-bold text-xl text-slate-800 dark:text-slate-100">
-              Thunaivan
-            </span>
+            <Logo />
           </motion.div>
         </Link>
         <Link href="/">

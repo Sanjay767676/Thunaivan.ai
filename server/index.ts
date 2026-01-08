@@ -5,6 +5,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import rateLimit from "express-rate-limit";
 
 const app = express();
 const httpServer = createServer(app);
@@ -35,6 +36,26 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Rate limiting for AI endpoints to handle large loads
+const aiRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10, // 10 requests per minute per IP
+  message: "Too many requests, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const pdfRateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 5, // 5 PDF uploads per 5 minutes per IP
+  message: "Too many PDF uploads, please wait a few minutes.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Export rate limiters for use in routes
+export { aiRateLimiter, pdfRateLimiter };
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

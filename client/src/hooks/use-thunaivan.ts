@@ -40,6 +40,35 @@ export function useAnalyzeWebsite() {
   });
 }
 
+// Hook for creating a conversation
+export function useCreateConversation() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (pdfId: number): Promise<{ id: number }> => {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pdfId }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create conversation");
+      }
+
+      return await res.json();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Conversation Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 // Hook for sending chat messages
 export function useChat() {
   const { toast } = useToast();

@@ -19,7 +19,7 @@ export async function multiModelAnalysis(content: string, query: string) {
   const [gpt, grok, gemini] = await Promise.all([
     openai.chat.completions.create({ model: "gpt-4o", messages: [{ role: "user", content: prompt }] }),
     xAI.chat.completions.create({ model: "grok-beta", messages: [{ role: "user", content: prompt }] }),
-    genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" }).generateContent(prompt)
+    genAI.getGenerativeModel({ model: "gemini-1.5-flash" }).generateContent(prompt)
   ]);
 
   return {

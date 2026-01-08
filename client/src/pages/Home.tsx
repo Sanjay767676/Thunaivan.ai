@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { AssistantAvatar } from "@/components/AssistantAvatar";
+import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, Upload, FileText, ShieldCheck, Sparkles, Zap } from "lucide-react";
@@ -109,17 +110,8 @@ export default function Home() {
 
       {/* Header */}
       <header className="w-full max-w-7xl mx-auto p-6 flex items-center justify-between relative z-10">
-        <div className="flex items-center gap-2">
-          <img 
-            src="/Logo.png" 
-            alt="Thunaivan Logo" 
-            className="h-10 w-auto object-contain"
-          />
-          <span className="font-display font-bold text-xl text-slate-800 dark:text-slate-100">
-            Thunaivan
-          </span>
-        </div>
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-400">
+        <Logo />
+        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-400 mr-40">
           <Link href="/how-it-works">
             <motion.a 
               className="hover:text-primary transition-colors cursor-pointer"

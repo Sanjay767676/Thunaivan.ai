@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { useChat } from "@/hooks/use-thunaivan";
+import { useChat, useCreateConversation } from "@/hooks/use-thunaivan";
 import { AssistantAvatar } from "@/components/AssistantAvatar";
+import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -41,6 +42,7 @@ export default function Visit() {
   
   // Hooks
   const chatMutation = useChat();
+  const createConversationMutation = useCreateConversation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [pdfFilename, setPdfFilename] = useState<string>("PDF Document");
 
@@ -63,24 +65,28 @@ export default function Visit() {
         return;
       }
 
-      // Create a new conversation (you might want to create an API endpoint for this)
-      // For now, we'll use a temporary conversation ID
-      const tempConversationId = Date.now(); // Temporary ID
-      setConversationId(tempConversationId);
-
-      setTimeout(() => {
-        setStatus("ready");
-        setAssistantState("idle");
-        setExtractedContent("PDF successfully analyzed using multiple AI models. Ask me anything about this document.");
-        
-        // Add initial greeting
-        setMessages([
-          { 
-            role: "assistant", 
-            content: `I've analyzed your PDF document using multiple AI models (GPT-4, Claude, Grok, and Gemini) working together. I'm ready to answer your questions based on its content.` 
-          }
-        ]);
-      }, 1000);
+      // Create a new conversation in the database
+      createConversationMutation.mutate(pdfIdNum, {
+        onSuccess: (data) => {
+          setConversationId(data.id);
+          setStatus("ready");
+          setAssistantState("idle");
+          setExtractedContent("PDF successfully analyzed using multiple AI models. Ask me anything about this document.");
+          
+          // Add initial greeting
+          setMessages([
+            { 
+              role: "assistant", 
+              content: `I've analyzed your PDF document using multiple AI models (GPT-4, Claude, Grok, and Gemini) working together. I'm ready to answer your questions based on its content.` 
+            }
+          ]);
+        },
+        onError: (error) => {
+          console.error(`Failed to create conversation: ${error.message}`);
+          setStatus("error");
+          setAssistantState("idle");
+        }
+      });
     }
   }, [pdfId, status, setLocation]);
 
@@ -233,12 +239,7 @@ export default function Visit() {
             <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <img 
-              src="/Logo.png" 
-              alt="Thunaivan Logo" 
-              className="h-8 w-auto object-contain"
-            />
-            <span className="font-bold">Thunaivan</span>
+            <Logo className="h-8 w-auto object-contain" />
           </div>
           <AssistantAvatar state={assistantState} size="sm" className="w-10 h-10" />
         </div>
