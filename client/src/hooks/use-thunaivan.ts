@@ -1,23 +1,19 @@
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  type AnalyzeRequest, 
-  type ChatRequest, 
-  type ChatResponse 
+import {
+  type AnalyzeRequest,
+  type ChatRequest,
+  type ChatResponse
 } from "@shared/schema";
 
-// Hook for analyzing a website
 export function useAnalyzeWebsite() {
   const { toast } = useToast();
-  
+
   return useMutation({
     mutationFn: async (data: AnalyzeRequest) => {
-      // Validate input before sending using the shared schema if possible, 
-      // but here we trust the API to return 400 if invalid.
-      // We manually fetch to handle the response parsing
-      const res = await fetch(api.analyze.path, {
-        method: api.analyze.method,
+      const res = await fetch(api.analyzePdf.path, {
+        method: api.analyzePdf.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
@@ -27,7 +23,6 @@ export function useAnalyzeWebsite() {
         throw new Error(errorData.message || "Failed to analyze website");
       }
 
-      // Parse with Zod schema if needed, but for now just return JSON
       return await res.json();
     },
     onError: (error: Error) => {
@@ -40,12 +35,14 @@ export function useAnalyzeWebsite() {
   });
 }
 
-// Hook for creating a conversation
 export function useCreateConversation() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (pdfId: number): Promise<{ id: number }> => {
+    mutationFn: async (pdfId: number): Promise<{
+      id: number,
+      document: { filename: string; type: string; summary: string }
+    }> => {
       const res = await fetch("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -69,7 +66,6 @@ export function useCreateConversation() {
   });
 }
 
-// Hook for sending chat messages
 export function useChat() {
   const { toast } = useToast();
 

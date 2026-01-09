@@ -6,21 +6,18 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { pdfMetadata, conversations, messages, insertPdfMetadataSchema, insertMessageSchema } from "@shared/schema";
 import { extractPdfText, multiModelAnalyze, getCombinedAnswer, speechToText } from "./lib/ai-multi";
+import { scrapeUrl, analyzeWebContent } from "./lib/web-analysis";
 import { processPdfForRag, queryPdfRag } from "./lib/pdf-rag";
 import { eq } from "drizzle-orm";
 import { log } from "./index";
 
-// Import pdf-parse - use require for CommonJS version
 const require = createRequire(import.meta.url);
-// pdf-parse exports an object with PDFParse function
 const pdfParseModule = require('pdf-parse');
-// PDFParse is the actual function we need
 const pdf = pdfParseModule.PDFParse;
 
-// Configure multer for file uploads
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
@@ -30,14 +27,12 @@ const upload = multer({
   }
 });
 
-// Import rate limiters from index
 import { aiRateLimiter, pdfRateLimiter } from "./index";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // POST /api/analyze-pdf - Analyze a PDF document (file upload)
   app.post("/api/analyze-pdf", pdfRateLimiter, upload.single('pdf'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
@@ -49,14 +44,11 @@ export async function registerRoutes(
 
       const fileSizeMB = (fileBuffer.length / 1024 / 1024).toFixed(2);
       log(`Extracting text from PDF: ${filename} (${fileSizeMB} MB)`);
-      
-      // Extract text from PDF buffer
-      // PDFParse v2 API: instantiate with { data: buffer } and call getText()
+
       if (!pdf) {
         throw new Error(`PDFParse not found. Available: ${Object.keys(pdfParseModule).join(', ')}`);
       }
-      
-      // Create PDFParse instance with the buffer data
+
       const pdfParser = new pdf({ data: fileBuffer });
       const pdfData = await pdfParser.getText();
       const extractedText = pdfData.text;
@@ -64,13 +56,11 @@ export async function registerRoutes(
       if (!extractedText || extractedText.trim().length === 0) {
         return res.status(400).json({ message: "PDF appears to be empty or unreadable" });
       }
-      
-      // Log extraction stats for large PDFs
+
       const textLength = extractedText.length;
       const estimatedPages = Math.ceil(textLength / 2500);
       log(`PDF text extracted: ${textLength.toLocaleString()} characters (~${estimatedPages} pages)`);
 
-      // Analyze the PDF using AI (multi-model)
       log(`Analyzing PDF content with multiple AI models`);
       let summary: string;
       try {
@@ -84,32 +74,28 @@ export async function registerRoutes(
         summary = `PDF content extracted successfully. AI analysis encountered an error: ${aiError.message}. You can still ask questions about the document.`;
       }
 
-      // Store in database (using a placeholder URL for uploaded files)
       let pdfId: number;
       if (db) {
         try {
           const [pdfRecord] = await db.insert(pdfMetadata).values({
             filename,
-            url: `uploaded://${filename}`, // Placeholder for uploaded files
+            url: `uploaded://${filename}`,
             extractedText,
             analysisSummary: summary,
           }).returning();
 
           pdfId = pdfRecord.id;
           log(`PDF analyzed and stored with ID: ${pdfId}`);
-          
-          // Process PDF for RAG (async, don't wait)
+
           processPdfForRag(pdfId, extractedText).catch((ragError: any) => {
             log(`RAG processing error (non-critical): ${ragError.message}`);
           });
         } catch (dbError: any) {
           log(`Database error: ${dbError.message}. Using temporary ID.`);
-          // If database fails, use a temporary ID (timestamp-based)
           pdfId = Date.now();
           log(`Using temporary PDF ID: ${pdfId}`);
         }
       } else {
-        // No database connection - use temporary ID
         pdfId = Date.now();
         log(`No database connection. Using temporary PDF ID: ${pdfId}`);
       }
@@ -122,7 +108,51 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/conversations - Create a new conversation for a PDF
+  app.post("/api/analyze-url", pdfRateLimiter, async (req: Request, res: Response) => {
+    try {
+      const { url } = req.body;
+      if (!url) {
+        return res.status(400).json({ message: "URL is required" });
+      }
+
+      log(`Analyzing URL: ${url}`);
+      const extractedText = await scrapeUrl(url);
+
+      if (!extractedText || extractedText.trim().length === 0) {
+        return res.status(400).json({ message: "URL content appears to be empty or unreadable" });
+      }
+
+      log(`Analyzing web content with Gemini`);
+      const summary = await analyzeWebContent(extractedText);
+
+      let docId: number;
+      if (db) {
+        const [record] = await db.insert(pdfMetadata).values({
+          filename: new URL(url).hostname,
+          url: url,
+          type: "web",
+          extractedText,
+          analysisSummary: summary,
+        }).returning();
+
+        docId = record.id;
+        log(`Web content analyzed and stored with ID: ${docId}`);
+
+        processPdfForRag(docId, extractedText).catch((ragError: any) => {
+          log(`RAG processing error (non-critical): ${ragError.message}`);
+        });
+      } else {
+        docId = Date.now();
+        log(`No database connection. Using temporary ID: ${docId}`);
+      }
+
+      res.json({ id: docId, summary });
+    } catch (error: any) {
+      log(`Error analyzing URL: ${error.message}`);
+      res.status(400).json({ message: error.message || "Failed to analyze URL" });
+    }
+  });
+
   app.post("/api/conversations", async (req: Request, res: Response) => {
     try {
       const { pdfId } = req.body;
@@ -135,7 +165,6 @@ export async function registerRoutes(
         return res.status(500).json({ message: "Database not configured. Please set DATABASE_URL environment variable." });
       }
 
-      // Verify PDF exists
       try {
         const [pdfRecord] = await db.select().from(pdfMetadata).where(eq(pdfMetadata.id, pdfId));
         if (!pdfRecord) {
@@ -146,14 +175,23 @@ export async function registerRoutes(
         return res.status(500).json({ message: "Database connection error" });
       }
 
-      // Create conversation
       try {
         const [conversation] = await db.insert(conversations).values({
           pdfId: parseInt(pdfId),
         }).returning();
-        
+
         log(`Conversation created with ID: ${conversation.id}`);
-        res.json({ id: conversation.id });
+
+        const [pdfRecord] = await db.select().from(pdfMetadata).where(eq(pdfMetadata.id, parseInt(pdfId)));
+
+        res.json({
+          id: conversation.id,
+          document: {
+            filename: pdfRecord.filename,
+            type: pdfRecord.type,
+            summary: pdfRecord.analysisSummary
+          }
+        });
       } catch (dbError: any) {
         log(`Database error when creating conversation: ${dbError.message}`);
         res.status(500).json({ message: "Failed to create conversation" });
@@ -164,7 +202,6 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/chat - Chat with AI about a PDF
   app.post("/api/chat", async (req: Request, res: Response) => {
     try {
       const { message, conversationId, pdfId } = req.body;
@@ -173,14 +210,13 @@ export async function registerRoutes(
         return res.status(400).json({ message: "message, conversationId, and pdfId are required" });
       }
 
-      // Get PDF context
       let pdfRecord: any;
       let context: string;
-      
+
       if (!db) {
         return res.status(500).json({ message: "Database not configured. Please set DATABASE_URL environment variable." });
       }
-      
+
       try {
         const [record] = await db.select().from(pdfMetadata).where(eq(pdfMetadata.id, pdfId));
         if (!record) {
@@ -192,7 +228,6 @@ export async function registerRoutes(
         return res.status(500).json({ message: "Database connection error. Please ensure DATABASE_URL is set correctly." });
       }
 
-      // Get conversation history
       let conversationMessages: any[] = [];
       try {
         conversationMessages = await db.select().from(messages)
@@ -202,36 +237,32 @@ export async function registerRoutes(
         log(`Database error when fetching messages: ${dbError.message}. Continuing without history.`);
       }
 
-      // Use RAG to get only relevant chunks (reduces token usage significantly!)
       try {
-        const ragResults = await queryPdfRag(pdfId, message, 5); // Get top 5 relevant chunks
+        const ragResults = await queryPdfRag(pdfId, message, 5);
         const relevantChunks = ragResults.chunks.join('\n\n---\n\n');
         const summary = pdfRecord.analysisSummary || 'No summary available';
-        
+
         context = `PDF Summary: ${summary}\n\nRelevant sections from the document:\n${relevantChunks}`;
         log(`Using RAG: Retrieved ${ragResults.chunks.length} relevant chunks (reduced from full ${pdfRecord.extractedText.length} chars)`);
       } catch (ragError: any) {
-        // Fallback to full text if RAG fails
         log(`RAG query failed: ${ragError.message}, using full text fallback`);
         const fullText = pdfRecord.extractedText || '';
         const textLength = fullText.length;
-        const contextLength = Math.min(textLength, 20000); // Reduced for Ollama
-        
+        const contextLength = Math.min(textLength, 20000);
+
         let contextText = fullText;
         if (textLength > contextLength) {
           const beginning = fullText.substring(0, 10000);
           const end = fullText.substring(textLength - 10000);
           contextText = `${beginning}\n\n[... ${textLength - 20000} characters omitted ...]\n\n${end}`;
         }
-        
+
         context = `PDF Summary: ${pdfRecord.analysisSummary || 'No summary available'}\n\nDocument Text:\n${contextText}`;
       }
 
-      // Get AI response
       log(`Getting AI response for chat message`);
       const answer = await getCombinedAnswer(message, context);
 
-      // Save messages (optional - continue even if database fails)
       if (db) {
         try {
           await db.insert(messages).values({
@@ -261,7 +292,6 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/stt - Speech to text
   app.post("/api/stt", async (req: Request, res: Response) => {
     try {
       const { audioBase64 } = req.body;

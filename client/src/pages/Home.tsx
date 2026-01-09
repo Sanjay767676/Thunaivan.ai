@@ -4,12 +4,15 @@ import { AssistantAvatar } from "@/components/AssistantAvatar";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Upload, FileText, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowRight, Upload, FileText, ShieldCheck, Sparkles, Zap, Globe, Link as LinkIcon } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [url, setUrl] = useState("");
+  const [mode, setMode] = useState<"pdf" | "url">("pdf");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +65,7 @@ export default function Home() {
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!file) {
       toast({
         title: "No file selected",
@@ -73,7 +76,7 @@ export default function Home() {
     }
 
     setIsUploading(true);
-    
+
     try {
       const formData = new FormData();
       formData.append('pdf', file);
@@ -101,19 +104,47 @@ export default function Home() {
     }
   };
 
+  const handleUrlAnalyze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!url.trim()) return;
+
+    setIsUploading(true);
+    try {
+      const response = await fetch('/api/analyze-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to analyze URL');
+      }
+
+      const data = await response.json();
+      setLocation(`/visit?pdfId=${data.id}`);
+    } catch (error: any) {
+      toast({
+        title: "Analysis failed",
+        description: error.message || "Failed to analyze URL. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900 flex flex-col relative overflow-hidden">
-      
-      {/* Abstract Background Decoration */}
+
       <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary/5 blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-accent/5 blur-[80px] pointer-events-none" />
 
-      {/* Header */}
       <header className="w-full max-w-7xl mx-auto p-6 flex items-center justify-between relative z-10">
         <Logo />
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-400 mr-40">
           <Link href="/how-it-works">
-            <motion.a 
+            <motion.a
               className="hover:text-primary transition-colors cursor-pointer"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -122,7 +153,7 @@ export default function Home() {
             </motion.a>
           </Link>
           <Link href="/privacy">
-            <motion.a 
+            <motion.a
               className="hover:text-primary transition-colors cursor-pointer"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -131,7 +162,7 @@ export default function Home() {
             </motion.a>
           </Link>
           <Link href="/about">
-            <motion.a 
+            <motion.a
               className="hover:text-primary transition-colors cursor-pointer"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -142,13 +173,11 @@ export default function Home() {
         </nav>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative z-10">
-        
+
         <div className="max-w-4xl w-full mx-auto grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
-          
-          {/* Left: Text Content */}
-          <motion.div 
+
+          <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
@@ -159,28 +188,28 @@ export default function Home() {
                 <ShieldCheck className="w-3 h-3" />
                 Government Intelligence
               </div>
-              <motion.h1 
+              <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
                 className="text-4xl sm:text-5xl lg:text-6xl font-display font-bold text-slate-900 dark:text-white leading-[1.1]"
               >
                 Your AI Assistant for <br />
-                <motion.span 
+                <motion.span
                   className="text-primary bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
-                  animate={{ 
+                  animate={{
                     backgroundPosition: ["0%", "100%", "0%"],
                   }}
-                  transition={{ 
-                    duration: 3, 
-                    repeat: Infinity, 
-                    ease: "linear" 
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "linear"
                   }}
                 >
                   Government Data
                 </motion.span>
               </motion.h1>
-              <motion.p 
+              <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.4 }}
@@ -190,133 +219,189 @@ export default function Home() {
               </motion.p>
             </div>
 
-            <motion.form 
-              onSubmit={handleAnalyze} 
-              className="relative max-w-md mx-auto lg:mx-0 group"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.6 }}
-            >
-              <div 
-                className={`relative border-2 border-dashed rounded-2xl p-8 transition-all duration-300 ${
-                  isDragging 
-                    ? 'border-primary bg-primary/5 scale-105' 
-                    : file 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-primary/50'
-                }`}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  className="hidden"
-                  onChange={(e) => {
-                    const selectedFile = e.target.files?.[0];
-                    if (selectedFile) handleFileSelect(selectedFile);
-                  }}
-                />
-                
-                <div className="flex flex-col items-center justify-center gap-4">
-                  <motion.div
-                    animate={{ 
-                      scale: isDragging ? 1.1 : 1,
-                      rotate: isDragging ? 5 : 0
-                    }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
-                    <Upload className="w-12 h-12 text-primary" />
-                  </motion.div>
-                  
-                  {file ? (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="flex items-center gap-2 text-primary font-semibold"
-                    >
-                      <FileText className="w-5 h-5" />
-                      <span className="truncate max-w-xs">{file.name}</span>
-                    </motion.div>
-                  ) : (
-                    <div className="text-center">
-                      <p className="text-slate-600 dark:text-slate-300 font-medium">
-                        Drop your PDF here or click to browse
-                      </p>
-                      <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-                        Maximum file size: 50MB
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
+            <Tabs defaultValue="pdf" className="w-full max-w-md mx-auto lg:mx-0" onValueChange={(v) => setMode(v as any)}>
+              <TabsList className="grid w-full grid-cols-2 mb-4 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <TabsTrigger value="pdf" className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm">
+                  <FileText className="w-4 h-4 mr-2" />
+                  PDF Upload
+                </TabsTrigger>
+                <TabsTrigger value="url" className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm">
+                  <Globe className="w-4 h-4 mr-2" />
+                  Web URL
+                </TabsTrigger>
+              </TabsList>
 
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: file ? 1 : 0 }}
-                className="mt-4"
-              >
-                <Button 
-                  size="lg" 
-                  type="submit"
-                  disabled={!file || isUploading}
-                  className="w-full rounded-xl px-6 h-12 font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg shadow-primary/25 transition-all disabled:opacity-50"
+              <TabsContent value="pdf">
+                <motion.form
+                  onSubmit={handleAnalyze}
+                  className="relative group"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
                 >
-                  {isUploading ? (
-                    <>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
-                      />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      Analyze with AI
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </motion.div>
-            </motion.form>
+                  <div
+                    className={`relative border-2 border-dashed rounded-2xl p-8 transition-all duration-300 ${isDragging
+                      ? 'border-primary bg-primary/5 scale-105'
+                      : file
+                        ? 'border-primary bg-primary/5'
+                        : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-primary/50'
+                      }`}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const selectedFile = e.target.files?.[0];
+                        if (selectedFile) handleFileSelect(selectedFile);
+                      }}
+                    />
 
-            <motion.div 
+                    <div className="flex flex-col items-center justify-center gap-4">
+                      <motion.div
+                        animate={{
+                          scale: isDragging ? 1.1 : 1,
+                          rotate: isDragging ? 5 : 0
+                        }}
+                        transition={{ type: "spring", stiffness: 300 }}
+                      >
+                        <Upload className="w-12 h-12 text-primary" />
+                      </motion.div>
+
+                      {file ? (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="flex items-center gap-2 text-primary font-semibold"
+                        >
+                          <FileText className="w-5 h-5" />
+                          <span className="truncate max-w-xs">{file.name}</span>
+                        </motion.div>
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-slate-600 dark:text-slate-300 font-medium">
+                            Drop your PDF here or click to browse
+                          </p>
+                          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+                            Maximum file size: 50MB
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: file ? 1 : 0 }}
+                    className="mt-4"
+                  >
+                    <Button
+                      size="lg"
+                      type="submit"
+                      disabled={!file || isUploading}
+                      className="w-full rounded-xl px-6 h-12 font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg shadow-primary/25 transition-all disabled:opacity-50"
+                    >
+                      {isUploading ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
+                          />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          Analyze with AI
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
+                </motion.form>
+              </TabsContent>
+
+              <TabsContent value="url">
+                <motion.form
+                  onSubmit={handleUrlAnalyze}
+                  className="space-y-4"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                      <LinkIcon className="w-5 h-5" />
+                    </div>
+                    <Input
+                      placeholder="Paste government scheme URL here..."
+                      className="pl-12 h-14 rounded-2xl border-2 border-slate-200 dark:border-slate-700 focus:border-primary/50 transition-all bg-white dark:bg-slate-800"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    size="lg"
+                    type="submit"
+                    disabled={!url.trim() || isUploading}
+                    className="w-full rounded-xl px-6 h-12 font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg shadow-primary/25 transition-all disabled:opacity-50"
+                  >
+                    {isUploading ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"
+                        />
+                        Analyzing Web Page...
+                      </>
+                    ) : (
+                      <>
+                        Analyze URL
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </motion.form>
+              </TabsContent>
+            </Tabs>
+
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.8 }}
               className="flex items-center justify-center lg:justify-start gap-6 text-sm text-slate-500 flex-wrap"
             >
-              <motion.div 
+              <motion.div
                 className="flex items-center gap-2"
                 whileHover={{ scale: 1.05 }}
               >
-                <motion.div 
+                <motion.div
                   className="w-2 h-2 rounded-full bg-emerald-500"
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 />
                 <span>Multi-Model AI</span>
               </motion.div>
-              <motion.div 
+              <motion.div
                 className="flex items-center gap-2"
                 whileHover={{ scale: 1.05 }}
               >
-                <motion.div 
+                <motion.div
                   className="w-2 h-2 rounded-full bg-blue-500"
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
                 />
                 <span>Instant Analysis</span>
               </motion.div>
-              <motion.div 
+              <motion.div
                 className="flex items-center gap-2"
                 whileHover={{ scale: 1.05 }}
               >
-                <motion.div 
+                <motion.div
                   className="w-2 h-2 rounded-full bg-purple-500"
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ duration: 2, repeat: Infinity, delay: 1 }}
@@ -326,8 +411,7 @@ export default function Home() {
             </motion.div>
           </motion.div>
 
-          {/* Right: 3D Visualization */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
@@ -344,11 +428,10 @@ export default function Home() {
               mouseY.set(0.5);
             }}
           >
-            <motion.div 
+            <motion.div
               className="relative"
               style={{ x, y }}
             >
-              {/* Animated gradient orb */}
               <motion.div
                 className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-20 blur-3xl"
                 animate={{
@@ -362,8 +445,7 @@ export default function Home() {
                 }}
                 style={{ width: '400px', height: '400px', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
               />
-              
-              {/* Decorative rings */}
+
               <motion.div
                 className="absolute inset-0 border-2 border-blue-300/30 dark:border-blue-600/30 rounded-full"
                 style={{ width: '300px', height: '300px', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
@@ -401,8 +483,7 @@ export default function Home() {
                   ease: "linear"
                 }}
               />
-              
-              {/* Floating particles */}
+
               {[...Array(6)].map((_, i) => (
                 <motion.div
                   key={i}
@@ -425,7 +506,7 @@ export default function Home() {
                   }}
                 />
               ))}
-              
+
               <div className="relative z-10">
                 <AssistantAvatar state="idle" size="xl" />
               </div>
@@ -435,9 +516,8 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="w-full py-6 text-center text-sm text-slate-400 dark:text-slate-600 relative z-10">
-        <p>© 2024 Thunaivan AI. Powered by Multi-Model AI.</p>
+        <p>© 2025 Thunaivan AI. By Sentinel Automation services</p>
       </footer>
     </div>
   );

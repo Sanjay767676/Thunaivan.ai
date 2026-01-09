@@ -40,7 +40,6 @@ export function RegionSelector() {
           ref={constraintsRef}
           className="relative w-32 h-10 bg-slate-200 dark:bg-slate-700 rounded-full p-1 cursor-pointer"
         >
-          {/* Background Slider */}
           <motion.div
             className="absolute inset-0 rounded-full"
             style={{
@@ -51,7 +50,6 @@ export function RegionSelector() {
             <div className="w-full h-full bg-gradient-to-r from-primary to-primary/80 rounded-full shadow-md" />
           </motion.div>
 
-          {/* Draggable Button */}
           <motion.div
             drag="x"
             dragConstraints={constraintsRef}
@@ -73,7 +71,6 @@ export function RegionSelector() {
             </motion.span>
           </motion.div>
 
-          {/* Labels */}
           <div className="absolute inset-0 flex items-center justify-between px-3 pointer-events-none">
             <motion.span
               className="text-xs font-medium text-slate-600 dark:text-slate-400"
@@ -93,4 +90,3 @@ export function RegionSelector() {
     </motion.div>
   );
 }
-

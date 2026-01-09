@@ -14,8 +14,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function multiModelAnalysis(content: string, query: string) {
   const prompt = `Analyze this content and answer: ${query}\n\nContent: ${content.substring(0, 10000)}`;
-  
-  // Parallel execution for collaboration (simplified consensus)
+
   const [gpt, grok, gemini] = await Promise.all([
     openai.chat.completions.create({ model: "gpt-4o", messages: [{ role: "user", content: prompt }] }),
     xAI.chat.completions.create({ model: "grok-beta", messages: [{ role: "user", content: prompt }] }),

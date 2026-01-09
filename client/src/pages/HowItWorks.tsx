@@ -34,10 +34,9 @@ const steps = [
 export default function HowItWorks() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
-      {/* Header */}
       <header className="w-full max-w-7xl mx-auto p-6 flex items-center justify-between">
         <Link href="/">
-          <motion.div 
+          <motion.div
             className="flex items-center gap-2 cursor-pointer"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -53,7 +52,6 @@ export default function HowItWorks() {
         </Link>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-6xl mx-auto px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -69,7 +67,6 @@ export default function HowItWorks() {
           </p>
         </motion.div>
 
-        {/* Steps */}
         <div className="grid md:grid-cols-2 gap-8 mb-16">
           {steps.map((step, index) => {
             const Icon = step.icon;
@@ -83,7 +80,7 @@ export default function HowItWorks() {
               >
                 <div className="relative bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-slate-100 dark:border-slate-700">
                   <div className={`absolute inset-0 bg-gradient-to-br ${step.color} opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity duration-300`} />
-                  
+
                   <motion.div
                     className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${step.color} mb-4`}
                     whileHover={{ scale: 1.1, rotate: 5 }}
@@ -108,7 +105,6 @@ export default function HowItWorks() {
           })}
         </div>
 
-        {/* Features */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -152,7 +148,6 @@ export default function HowItWorks() {
           </div>
         </motion.div>
 
-        {/* CTA */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -170,4 +165,3 @@ export default function HowItWorks() {
     </div>
   );
 }
-

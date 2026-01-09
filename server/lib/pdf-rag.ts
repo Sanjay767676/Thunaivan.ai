@@ -1,20 +1,8 @@
 import { pipeline } from '@xenova/transformers';
 import { db } from "../db";
-import { pdfMetadata } from "@shared/schema";
+import { pdfMetadata, documentChunks } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
-// In-memory cache for PDF chunks and embeddings
-interface PdfRagDocument {
-  pdfId: number;
-  text: string;
-  chunks: string[];
-  embeddings: number[][];
-  chunkMetadata: Array<{ start: number; end: number; page?: number }>;
-}
-
-const vectorStore = new Map<number, PdfRagDocument>();
-
-// Singleton for embedding pipeline
 let extractor: any = null;
 
 async function getExtractor() {
@@ -24,10 +12,6 @@ async function getExtractor() {
   return extractor;
 }
 
-/**
- * Chunk PDF text intelligently for RAG
- * Optimized for 10-150 page PDFs
- */
 function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200): {
   chunks: string[];
   metadata: Array<{ start: number; end: number }>;
@@ -35,7 +19,6 @@ function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200
   const chunks: string[] = [];
   const metadata: Array<{ start: number; end: number }> = [];
 
-  // Split by sentences first for better chunking
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
 
   let currentChunk = '';
@@ -46,14 +29,12 @@ function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200
     const potentialChunk = currentChunk + sentence;
 
     if (potentialChunk.length > chunkSize && currentChunk.length > 0) {
-      // Save current chunk
       chunks.push(currentChunk.trim());
       metadata.push({
         start: startIndex,
         end: startIndex + currentChunk.length
       });
 
-      // Start new chunk with overlap
       const overlapText = currentChunk.slice(-overlap);
       currentChunk = overlapText + sentence;
       startIndex = startIndex + currentChunk.length - overlap - sentence.length;
@@ -62,7 +43,6 @@ function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200
     }
   }
 
-  // Add final chunk
   if (currentChunk.trim().length > 0) {
     chunks.push(currentChunk.trim());
     metadata.push({
@@ -74,107 +54,106 @@ function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200
   return { chunks, metadata };
 }
 
-/**
- * Process PDF text into chunks and embeddings for RAG
- */
-export async function processPdfForRag(pdfId: number, text: string): Promise<void> {
-  if (vectorStore.has(pdfId)) {
-    return; // Already processed
-  }
+export async function processPdfForRag(docId: number, text: string): Promise<void> {
+  try {
+    if (!db) return;
 
-  console.log(`[pdf-rag] Processing PDF ${pdfId} for RAG (${text.length} characters)`);
+    log(`[doc-rag] Processing document ${docId} for RAG (${text.length} characters)`);
 
-  // Clean text again just to be safe (whitespace normalization)
-  const cleanText = text
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  // Chunk the text (optimized for large PDFs)
-  const { chunks, metadata } = chunkText(cleanText, 1000, 200);
-  console.log(`[pdf-rag] Created ${chunks.length} chunks from PDF ${pdfId}`);
-
-  // Generate embeddings in batches to avoid memory issues
-  const pipe = await getExtractor();
-  const embeddings: number[][] = [];
-
-  // Process embeddings in batches of 10
-  const batchSize = 10;
-  for (let i = 0; i < chunks.length; i += batchSize) {
-    const batch = chunks.slice(i, i + batchSize);
-    const batchEmbeddings = await Promise.all(
-      batch.map(chunk =>
-        pipe(chunk, { pooling: 'mean', normalize: true }).then((output: any) =>
-          Array.from(output.data)
-        )
-      )
-    );
-    embeddings.push(...batchEmbeddings);
-
-    if (i % 50 === 0) {
-      console.log(`[pdf-rag] Processed ${Math.min(i + batchSize, chunks.length)}/${chunks.length} chunks`);
+    const existingChunks = await db.select().from(documentChunks).where(eq(documentChunks.docId, docId));
+    if (existingChunks.length > 0) {
+      log(`[doc-rag] Document ${docId} already processed for RAG`);
+      return;
     }
+
+    const cleanText = text
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    const { chunks, metadata } = chunkText(cleanText, 1000, 200);
+    log(`[doc-rag] Created ${chunks.length} chunks from document ${docId}`);
+
+    const pipe = await getExtractor();
+
+    const batchSize = 10;
+    for (let i = 0; i < chunks.length; i += batchSize) {
+      const batch = chunks.slice(i, i + batchSize);
+      const batchEmbeddings = await Promise.all(
+        batch.map(chunk =>
+          pipe(chunk, { pooling: 'mean', normalize: true }).then((output: any) =>
+            Array.from(output.data)
+          )
+        )
+      );
+
+      const inserts = batch.map((chunk, j) => ({
+        docId,
+        text: chunk,
+        embedding: batchEmbeddings[j],
+        metadata: metadata[i + j] || {}
+      }));
+
+      await db.insert(documentChunks).values(inserts);
+
+      if (i % 50 === 0) {
+        log(`[doc-rag] Embedded and stored ${Math.min(i + batchSize, chunks.length)}/${chunks.length} chunks`);
+      }
+    }
+
+    log(`[doc-rag] Document ${docId} RAG processing complete and stored in database`);
+  } catch (error: any) {
+    log(`[doc-rag] Error processing document for RAG: ${error.message}`);
+    throw error;
   }
-
-  vectorStore.set(pdfId, {
-    pdfId,
-    text,
-    chunks,
-    embeddings,
-    chunkMetadata: metadata
-  });
-
-  console.log(`[pdf-rag] PDF ${pdfId} RAG processing complete`);
 }
 
-/**
- * Query RAG system to find relevant chunks for a question
- * Returns top-k most relevant chunks
- */
+function log(message: string) {
+  console.log(message);
+}
+
 export async function queryPdfRag(
-  pdfId: number,
+  docId: number,
   question: string,
   topK: number = 3
 ): Promise<{ chunks: string[]; scores: number[] }> {
-  const doc = vectorStore.get(pdfId);
-  if (!doc) {
-    // Try to load from database and process
-    if (db) {
-      try {
-        const [pdfRecord] = await db.select().from(pdfMetadata).where(eq(pdfMetadata.id, pdfId));
-        if (pdfRecord && pdfRecord.extractedText) {
-          await processPdfForRag(pdfId, pdfRecord.extractedText);
-          const retryDoc = vectorStore.get(pdfId);
-          if (retryDoc) {
-            return queryPdfRag(pdfId, question, topK);
-          }
-        }
-      } catch (error: any) {
-        console.error(`[pdf-rag] Error loading PDF from database: ${error.message}`);
+  try {
+    if (!db) throw new Error("Database not connected");
+
+    const allChunks = await db.select().from(documentChunks).where(eq(documentChunks.docId, docId));
+
+    if (allChunks.length === 0) {
+      const [docRecord] = await db.select().from(pdfMetadata).where(eq(pdfMetadata.id, docId));
+      if (docRecord && docRecord.extractedText) {
+        await processPdfForRag(docId, docRecord.extractedText);
+        return queryPdfRag(docId, question, topK);
       }
+      throw new Error(`Document ${docId} not found or not analyzed.`);
     }
-    throw new Error(`PDF ${pdfId} not found in RAG store. Please re-upload the PDF.`);
+
+    const pipe = await getExtractor();
+    const output = await pipe(question, { pooling: 'mean', normalize: true });
+    const questionEmbedding = Array.from(output.data) as number[];
+
+    const scoredChunks = allChunks.map(chunk => {
+      const chunkEmbedding = chunk.embedding as number[];
+      return {
+        text: chunk.text,
+        score: cosineSimilarity(questionEmbedding, chunkEmbedding)
+      };
+    });
+
+    scoredChunks.sort((a, b) => b.score - a.score);
+    const topResults = scoredChunks.slice(0, topK);
+
+    return {
+      chunks: topResults.map(r => r.text),
+      scores: topResults.map(r => r.score)
+    };
+  } catch (error: any) {
+    log(`[doc-rag] Error querying RAG: ${error.message}`);
+    throw error;
   }
-
-  // Embed the question
-  const pipe = await getExtractor();
-  const output = await pipe(question, { pooling: 'mean', normalize: true });
-  const questionEmbedding = Array.from(output.data) as number[];
-
-  // Find similar chunks using cosine similarity
-  const similarities = doc.embeddings.map((emb, i) => ({
-    index: i,
-    score: cosineSimilarity(questionEmbedding, emb)
-  }));
-
-  // Get top-k chunks
-  similarities.sort((a, b) => b.score - a.score);
-  const topResults = similarities.slice(0, topK);
-
-  return {
-    chunks: topResults.map(r => doc.chunks[r.index]),
-    scores: topResults.map(r => r.score)
-  };
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -190,10 +169,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return denominator === 0 ? 0 : dot / denominator;
 }
 
-/**
- * Clear RAG cache for a PDF (useful for memory management)
- */
-export function clearPdfRag(pdfId: number): void {
-  vectorStore.delete(pdfId);
+export async function clearPdfRag(docId: number): Promise<void> {
+  if (!db) return;
+  try {
+    await db.delete(documentChunks).where(eq(documentChunks.docId, docId));
+  } catch (error) {
+    log(`[doc-rag] Error clearing RAG data: ${(error as any).message}`);
+  }
 }
-

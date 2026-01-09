@@ -11,7 +11,6 @@ interface AssistantAvatarProps {
 }
 
 export function AssistantAvatar({ state, className, size = "md" }: AssistantAvatarProps) {
-  // Dimensions based on size prop
   const sizeMap = {
     sm: "w-16 h-16",
     md: "w-32 h-32",
@@ -21,7 +20,6 @@ export function AssistantAvatar({ state, className, size = "md" }: AssistantAvat
 
   const containerSize = sizeMap[size];
 
-  // Animation variants
   const variants = {
     idle: {
       scale: [1, 1.05, 1],
@@ -58,14 +56,13 @@ export function AssistantAvatar({ state, className, size = "md" }: AssistantAvat
     },
   };
 
-  // Color states
   const colors = {
     idle: "from-blue-500/20 to-cyan-500/20",
     listening: "from-blue-500/40 to-cyan-500/40",
     thinking: "from-purple-500/40 to-indigo-500/40",
     speaking: "from-emerald-500/40 to-teal-500/40",
   };
-  
+
   const coreColors = {
     idle: "bg-blue-500",
     listening: "bg-cyan-500",
@@ -75,7 +72,6 @@ export function AssistantAvatar({ state, className, size = "md" }: AssistantAvat
 
   return (
     <div className={clsx("relative flex items-center justify-center", containerSize, className)}>
-      {/* Outer Glow Ring 1 */}
       <motion.div
         className={clsx(
           "absolute inset-0 rounded-full blur-xl bg-gradient-to-tr opacity-50",
@@ -91,7 +87,6 @@ export function AssistantAvatar({ state, className, size = "md" }: AssistantAvat
         transition={{ duration: 3, repeat: Infinity }}
       />
 
-      {/* Outer Glow Ring 2 (Secondary) */}
       <motion.div
         className={clsx(
           "absolute inset-4 rounded-full blur-lg bg-gradient-to-bl opacity-40 mix-blend-screen",
@@ -101,7 +96,6 @@ export function AssistantAvatar({ state, className, size = "md" }: AssistantAvat
         variants={variants}
       />
 
-      {/* Core Orb */}
       <motion.div
         className={clsx(
           "relative z-10 w-1/2 h-1/2 rounded-full shadow-inner shadow-white/50 backdrop-blur-sm",
@@ -110,13 +104,11 @@ export function AssistantAvatar({ state, className, size = "md" }: AssistantAvat
         animate={state}
         variants={variants}
       >
-        {/* Shine effect on the orb */}
         <div className="absolute top-2 left-2 w-1/3 h-1/3 bg-white/40 rounded-full blur-[2px]" />
       </motion.div>
-      
-      {/* Orbital Particles (only when thinking) */}
+
       {state === "thinking" && (
-        <motion.div 
+        <motion.div
           className="absolute inset-0 z-0"
           animate={{ rotate: 360 }}
           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}

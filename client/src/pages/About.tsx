@@ -34,10 +34,9 @@ const values = [
 export default function About() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
-      {/* Header */}
       <header className="w-full max-w-7xl mx-auto p-6 flex items-center justify-between">
         <Link href="/">
-          <motion.div 
+          <motion.div
             className="flex items-center gap-2 cursor-pointer"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -53,7 +52,6 @@ export default function About() {
         </Link>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-4xl mx-auto px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -69,7 +67,6 @@ export default function About() {
           </p>
         </motion.div>
 
-        {/* Story */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -79,24 +76,23 @@ export default function About() {
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Our Story</h2>
           <div className="space-y-4 text-slate-600 dark:text-slate-300 leading-relaxed">
             <p>
-              Thunaivan was born from a simple observation: government documents are often complex, 
-              lengthy, and difficult to understand. Yet they contain critical information that affects 
+              Thunaivan was born from a simple observation: government documents are often complex,
+              lengthy, and difficult to understand. Yet they contain critical information that affects
               millions of lives.
             </p>
             <p>
-              We set out to bridge this gap by combining the power of multiple AI models—each bringing 
-              unique perspectives and strengths—to analyze and explain government documents in a way 
+              We set out to bridge this gap by combining the power of multiple AI models—each bringing
+              unique perspectives and strengths—to analyze and explain government documents in a way
               that's accessible to everyone.
             </p>
             <p>
-              Our multi-model approach ensures that you get not just one AI's interpretation, but a 
-              comprehensive analysis that cross-validates insights across different AI systems, 
+              Our multi-model approach ensures that you get not just one AI's interpretation, but a
+              comprehensive analysis that cross-validates insights across different AI systems,
               resulting in more accurate and reliable information.
             </p>
           </div>
         </motion.div>
 
-        {/* Values */}
         <div className="grid md:grid-cols-2 gap-6 mb-12">
           {values.map((value, index) => {
             const Icon = value.icon;
@@ -126,7 +122,6 @@ export default function About() {
           })}
         </div>
 
-        {/* Technology */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -159,7 +154,6 @@ export default function About() {
           </div>
         </motion.div>
 
-        {/* CTA */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -177,4 +171,3 @@ export default function About() {
     </div>
   );
 }
-

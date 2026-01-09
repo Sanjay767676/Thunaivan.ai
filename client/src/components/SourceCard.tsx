@@ -1,6 +1,5 @@
-import { ExternalLink } from "lucide-react";
-import type { Source } from "@shared/schema";
 import { motion } from "framer-motion";
+import type { Source } from "@shared/schema";
 
 interface SourceCardProps {
   source: Source;
@@ -9,7 +8,7 @@ interface SourceCardProps {
 
 export function SourceCard({ source, index }: SourceCardProps) {
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
@@ -24,9 +23,9 @@ export function SourceCard({ source, index }: SourceCardProps) {
           {source.relevance && (
             <div className="flex items-center gap-2 mt-2">
               <div className="h-1 w-16 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary/60" 
-                  style={{ width: `${Math.round(source.relevance * 100)}%` }} 
+                <div
+                  className="h-full bg-primary/60"
+                  style={{ width: `${Math.round(source.relevance * 100)}%` }}
                 />
               </div>
               <span className="text-xs text-muted-foreground">

@@ -1,6 +1,5 @@
 import { extractPdfText, multiModelAnalyze } from '../server/lib/ai-multi';
 
-// Mock function to test whitespace cleaning logic
 function testWhitespaceCleaning() {
     console.log("Testing whitespace cleaning...");
 
@@ -11,7 +10,6 @@ function testWhitespaceCleaning() {
     
     newlines.`;
 
-    // Applying the same logic as implemented in extractPdfText
     const cleanText = dirtyText
         .split('\n')
         .map((line: string) => line.trim())

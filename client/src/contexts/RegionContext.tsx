@@ -12,25 +12,17 @@ const RegionContext = createContext<RegionContextType | undefined>(undefined);
 
 export function RegionProvider({ children }: { children: ReactNode }) {
   const [region, setRegion] = useState<Region>(() => {
-    // Load from localStorage or default to tamilnadu
     const saved = localStorage.getItem("region") as Region | null;
     return saved || "tamilnadu";
   });
 
   const logoPath = region === "india" ? "/India.png" : "/Logo.png";
-  
-  // Force component updates when region changes
+
   const [, forceUpdate] = useState({});
-  const updateRegion = (newRegion: Region) => {
-    setRegion(newRegion);
-    localStorage.setItem("region", newRegion);
-    forceUpdate({}); // Trigger re-render
-  };
 
   const handleSetRegion = (newRegion: Region) => {
     setRegion(newRegion);
     localStorage.setItem("region", newRegion);
-    // Trigger a small delay to ensure state updates propagate
     setTimeout(() => {
       window.dispatchEvent(new Event('regionchange'));
     }, 0);
@@ -50,4 +42,3 @@ export function useRegion() {
   }
   return context;
 }
-

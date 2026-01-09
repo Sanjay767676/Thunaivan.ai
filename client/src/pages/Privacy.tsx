@@ -26,7 +26,7 @@ const privacyPoints = [
   {
     icon: Server,
     title: "Encrypted Processing",
-    description: "All AI processing happens on encrypted servers with strict access controls and monitoring.",
+    description: "All AI processing happens on encrypted servers with split access controls and monitoring.",
     color: "from-green-500 to-emerald-500"
   }
 ];
@@ -34,10 +34,9 @@ const privacyPoints = [
 export default function Privacy() {
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
-      {/* Header */}
       <header className="w-full max-w-7xl mx-auto p-6 flex items-center justify-between">
         <Link href="/">
-          <motion.div 
+          <motion.div
             className="flex items-center gap-2 cursor-pointer"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -53,7 +52,6 @@ export default function Privacy() {
         </Link>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-4xl mx-auto px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -77,7 +75,6 @@ export default function Privacy() {
           </p>
         </motion.div>
 
-        {/* Privacy Points */}
         <div className="grid md:grid-cols-2 gap-6 mb-12">
           {privacyPoints.map((point, index) => {
             const Icon = point.icon;
@@ -107,7 +104,6 @@ export default function Privacy() {
           })}
         </div>
 
-        {/* Privacy Policy Content */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -115,13 +111,13 @@ export default function Privacy() {
           className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg border border-slate-100 dark:border-slate-700 space-y-6"
         >
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Our Commitment</h2>
-          
+
           <div className="space-y-4 text-slate-600 dark:text-slate-300">
             <p>
-              At Thunaivan, we understand that government documents often contain sensitive information. 
+              At Thunaivan, we understand that government documents often contain sensitive information.
               We've built our platform with privacy and security as foundational principles.
             </p>
-            
+
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mt-6">Data Handling</h3>
             <ul className="list-disc list-inside space-y-2 ml-4">
               <li>PDFs are processed in-memory and not permanently stored</li>
@@ -147,7 +143,6 @@ export default function Privacy() {
           </div>
         </motion.div>
 
-        {/* Contact */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -171,4 +166,3 @@ export default function Privacy() {
     </div>
   );
 }
-

@@ -1,6 +1,5 @@
 import axios from "axios";
 
-// Helper function for logging
 function log(message: string) {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -11,14 +10,9 @@ function log(message: string) {
   console.log(`${formattedTime} [ollama] ${message}`);
 }
 
-// Ollama configuration
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-// Use qwen2.5:7b as default (user preference), with fallback to other models
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "phi3:mini"; // Exact model name confirmed from 'ollama list'
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "phi3:mini";
 
-/**
- * Check if Ollama is available
- */
 export async function isOllamaAvailable(): Promise<boolean> {
   try {
     const response = await axios.get(`${OLLAMA_BASE_URL}/api/tags`, {
@@ -30,9 +24,6 @@ export async function isOllamaAvailable(): Promise<boolean> {
   }
 }
 
-/**
- * Generate text using Ollama (unlimited, free, local)
- */
 export async function generateWithOllama(
   prompt: string,
   systemPrompt?: string,
@@ -43,8 +34,8 @@ export async function generateWithOllama(
   }
 ): Promise<string> {
   const model = options?.model || OLLAMA_MODEL;
-  const maxTokens = options?.maxTokens || 1000; // Increased for better quality
-  const temperature = options?.temperature || 0.3; // Balanced temperature
+  const maxTokens = options?.maxTokens || 1000;
+  const temperature = options?.temperature || 0.3;
 
   try {
     log(`Generating with Ollama model: ${model}`);
@@ -61,7 +52,7 @@ export async function generateWithOllama(
         },
       },
       {
-        timeout: 600000, // 10 minutes (increased to allow model to complete)
+        timeout: 600000,
       }
     );
 
@@ -81,9 +72,6 @@ export async function generateWithOllama(
   }
 }
 
-/**
- * Chat completion using Ollama (for conversation context)
- */
 export async function chatWithOllama(
   messages: Array<{ role: string; content: string }>,
   options?: {
@@ -93,8 +81,8 @@ export async function chatWithOllama(
   }
 ): Promise<string> {
   const model = options?.model || OLLAMA_MODEL;
-  const maxTokens = options?.maxTokens || 800; // Increased for better quality
-  const temperature = options?.temperature || 0.3; // Balanced temperature
+  const maxTokens = options?.maxTokens || 800;
+  const temperature = options?.temperature || 0.3;
 
   try {
     log(`Chatting with Ollama model: ${model}`);
@@ -114,7 +102,7 @@ export async function chatWithOllama(
         },
       },
       {
-        timeout: 600000, // 10 minutes (increased to allow model to complete)
+        timeout: 600000,
       }
     );
 
@@ -134,9 +122,6 @@ export async function chatWithOllama(
   }
 }
 
-/**
- * Pull/download a model if not available
- */
 export async function ensureModel(model: string = OLLAMA_MODEL): Promise<boolean> {
   try {
     log(`Checking if model ${model} is available...`);
@@ -150,7 +135,7 @@ export async function ensureModel(model: string = OLLAMA_MODEL): Promise<boolean
     }
 
     log(`Model ${model} not found. Pulling from Ollama...`);
-    await axios.post(`${OLLAMA_BASE_URL}/api/pull`, { name: model }, { timeout: 600000 }); // 10 minutes
+    await axios.post(`${OLLAMA_BASE_URL}/api/pull`, { name: model }, { timeout: 600000 });
     log(`Model ${model} pulled successfully`);
     return true;
   } catch (error: any) {
@@ -158,4 +143,3 @@ export async function ensureModel(model: string = OLLAMA_MODEL): Promise<boolean
     return false;
   }
 }
-

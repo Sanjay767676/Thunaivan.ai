@@ -5,12 +5,9 @@ import axios from "axios";
 import { generateWithOllama, chatWithOllama, isOllamaAvailable } from "./ollama";
 
 const require = createRequire(import.meta.url);
-// Import pdf-parse - use require for CommonJS version
 const pdfParseModule = require('pdf-parse');
-// PDFParse is the actual function we need
 const pdf = pdfParseModule.PDFParse;
 
-// Providers
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -20,9 +17,8 @@ const grok = new OpenAI({
   apiKey: process.env.GROK_API_KEY,
   baseURL: "https://api.x.ai/v1"
 });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+export const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// Helper function for logging
 function log(message: string) {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -35,14 +31,9 @@ function log(message: string) {
 
 export async function extractPdfText(url: string): Promise<string> {
   const response = await axios.get(url, { responseType: 'arraybuffer' });
-  // PDFParse v2 API: instantiate with { data: buffer } and call getText()
   const pdfParser = new pdf({ data: response.data });
   const data = await pdfParser.getText();
 
-  // Aggressive whitespace cleaning to reduce token usage
-  // 1. Replace multiple spaces with single space
-  // 2. Replace multiple newlines with double newline (to preserve paragraphs)
-  // 3. Trim lines
   const cleanText = data.text
     .split('\n')
     .map((line: string) => line.trim())
@@ -61,13 +52,11 @@ export async function multiModelAnalyze(text: string): Promise<string> {
   const useCloudAPIs = process.env.USE_CLOUD_APIS !== 'false';
   const ollamaAvailable = await isOllamaAvailable();
 
-  // Try Cloud APIs FIRST for speed
   if (useCloudAPIs) {
     log(`Cloud APIs enabled, trying Gemini/OpenRouter first for speed`);
 
-    // For very large PDFs, extract key sections intelligently
     let textToAnalyze = text;
-    const maxChars = 80000; // Safe limit for cloud APIs
+    const maxChars = 80000;
 
     if (text.length > maxChars) {
       const chunkSize = Math.floor(maxChars / 3);
@@ -78,7 +67,6 @@ export async function multiModelAnalyze(text: string): Promise<string> {
       log(`Large PDF detected (${text.length} chars). Using intelligent chunking.`);
     }
 
-    // 1. Try Gemini (Fastest & often free/available)
     try {
       log(`Trying Gemini fallback as fast primary...`);
       const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
@@ -101,7 +89,6 @@ export async function multiModelAnalyze(text: string): Promise<string> {
       log(`Gemini failed: ${geminiError.message}, falling back to OpenRouter/Ollama`);
     }
 
-    // 2. Try OpenRouter (Claude) 
     try {
       const response = await openrouter.chat.completions.create({
         model: "anthropic/claude-3.5-sonnet",
@@ -123,7 +110,6 @@ export async function multiModelAnalyze(text: string): Promise<string> {
     }
   }
 
-  // Final Fallback: Ollama (Local)
   if (ollamaAvailable) {
     try {
       log(`Using Ollama fallback (Local). Note: This may be slow depending on hardware.`);
@@ -156,7 +142,6 @@ export async function getCombinedAnswer(question: string, context: string): Prom
   const useCloudAPIs = process.env.USE_CLOUD_APIS !== 'false';
   const ollamaAvailable = await isOllamaAvailable();
 
-  // Try Cloud FIRST for instant response
   if (useCloudAPIs) {
     log(`Cloud APIs enabled, trying Gemini first for chat speed`);
 
@@ -166,14 +151,22 @@ export async function getCombinedAnswer(question: string, context: string): Prom
       contextToUse = context.substring(0, maxContextLength) + "\n[... truncated ...]";
     }
 
-    // 1. Gemini (Near instant)
     try {
       const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+      const personaPrompt = `You are a professional AI web content analyst. 
+ROLE: Your task is to analyze and answer questions strictly based on the provided document/website content.
+STRICT RULES:
+- Generate answers using ONLY the information present in the context.
+- Do NOT use external knowledge, assumptions, or prior training data.
+- If the answer is not explicitly available, respond with: "The requested information is not available on the provided website."
+- Do NOT hallucinate.
+- Clear, professional, and concise.
+- Structured when appropriate (bullet points, steps, headings).
+- Human-like and ChatGPT-style responses.
+- Cite the website section contextually (e.g., "According to the website...").`;
+
       const result = await model.generateContent(
-        `Answer the question DIRECTLY using ONLY the provided context.
-        - DO NOT say "Based on the context" or "According to the document".
-        - Be concise and structured.
-        - If the answer isn't in the context, say "Information not available".
+        `${personaPrompt}
 
         Context:
         ${contextToUse}
@@ -187,14 +180,21 @@ export async function getCombinedAnswer(question: string, context: string): Prom
     }
   }
 
-  // Fallback to Ollama
   if (ollamaAvailable) {
     try {
       log(`Using Ollama local fallback for chat...`);
+      const personaPrompt = `You are a professional AI web content analyst.
+ROLE: Answer questions strictly based on the provided content.
+STRICT RULES:
+- ONLY use information from the context.
+- No external knowledge or hallucinations.
+- If missing, say: "The requested information is not available on the provided website."
+- Structured, professional, and concise.`;
+
       const messages = [
         {
           role: "system",
-          content: "Answer the question DIRECTLY and CONCISELY. No preambles. Use ONLY the provided context."
+          content: personaPrompt
         },
         { role: "user", content: `Context:\n${context}\n\nQuestion: ${question}` }
       ];
@@ -208,11 +208,25 @@ export async function getCombinedAnswer(question: string, context: string): Prom
 }
 
 export async function speechToText(audioBase64: string): Promise<string> {
-  // OpenAI Whisper implementation
-  const buffer = Buffer.from(audioBase64, 'base64');
-  const response = await openai.audio.transcriptions.create({
-    file: await OpenAI.toFile(buffer, 'speech.mp3'),
-    model: "whisper-1",
-  });
-  return response.text;
+  log("Transcribing audio using Gemini 1.5 Flash...");
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: "audio/webm",
+          data: audioBase64
+        }
+      },
+      { text: "Transcribe this audio exactly as spoken. Return ONLY the transcription text, no preamble." }
+    ]);
+
+    const transcription = result.response.text().trim();
+    log(`Transcription successful: ${transcription.substring(0, 50)}...`);
+    return transcription;
+  } catch (error: any) {
+    log(`Gemini transcription failed: ${error.message}`);
+    throw error;
+  }
 }

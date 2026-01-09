@@ -29,7 +29,6 @@ function Router() {
 
 function App() {
   const [showSplash, setShowSplash] = useState(() => {
-    // Show splash only on first visit
     return !sessionStorage.getItem("splashShown");
   });
 

@@ -11,7 +11,6 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    // Simulate loading time
     const timer = setTimeout(() => {
       setLoading(false);
     }, 2000);
@@ -35,9 +34,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           transition={{ duration: 0.5 }}
           className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center overflow-hidden"
         >
-          {/* Animated Background Elements */}
           <div className="absolute inset-0">
-            {/* Floating particles */}
             {[...Array(20)].map((_, i) => (
               <motion.div
                 key={i}
@@ -59,7 +56,6 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
               />
             ))}
 
-            {/* Gradient orbs */}
             <motion.div
               className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl"
               animate={{
@@ -89,9 +85,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
             />
           </div>
 
-          {/* Main Content */}
           <div className="relative z-10 text-center">
-            {/* Loading Spinner */}
             {loading && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -122,7 +116,6 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
               </motion.div>
             )}
 
-            {/* Animated Icons */}
             {!loading && (
               <motion.div
                 initial={{ y: 50, opacity: 0 }}
@@ -151,7 +144,6 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
               </motion.div>
             )}
 
-            {/* Continue Button */}
             {!loading && (
               <motion.button
                 initial={{ y: 50, opacity: 0, scale: 0.9 }}
@@ -171,4 +163,3 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
     </AnimatePresence>
   );
 }
-

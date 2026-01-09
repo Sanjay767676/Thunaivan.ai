@@ -17,7 +17,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: { secure: app.get("env") === "production" },
   store: new MemoryStore({
-    checkPeriod: 86400000 // prune expired entries every 24h
+    checkPeriod: 86400000
   }),
 }));
 
@@ -37,24 +37,22 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-// Rate limiting for AI endpoints to handle large loads
 const aiRateLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 10, // 10 requests per minute per IP
+  windowMs: 1 * 60 * 1000,
+  max: 10,
   message: "Too many requests, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const pdfRateLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 5, // 5 PDF uploads per 5 minutes per IP
+  windowMs: 5 * 60 * 1000,
+  max: 5,
   message: "Too many PDF uploads, please wait a few minutes.",
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Export rate limiters for use in routes
 export { aiRateLimiter, pdfRateLimiter };
 
 export function log(message: string, source = "express") {
@@ -105,9 +103,6 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -115,14 +110,9 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   const host = process.env.HOST || "127.0.0.1";
 
-  // Only set `reusePort` on platforms that support it (skip on Windows)
   const listenOptions: any = { port, host };
   if (process.platform !== "win32") {
     listenOptions.reusePort = true;
