@@ -81,6 +81,7 @@ export async function multiModelAnalyze(text: string): Promise<string> {
         6. Contact information (if available)
         
         Be thorough but concise. Focus on actionable information.
+        Do NOT use horizontal rules or separators like *** or ---.
         
         Analyze this government scheme PDF document:\n\n${textToAnalyze}`
       );
@@ -153,17 +154,16 @@ export async function getCombinedAnswer(question: string, context: string): Prom
 
     try {
       const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-      const personaPrompt = `You are a professional AI web content analyst. 
-ROLE: Your task is to analyze and answer questions strictly based on the provided document/website content.
+      const personaPrompt = `You are the Thunaivan AI Professional Analyst, a government schemes and data expert. 
+Your tone is professional, clear, structured, and human-like.
+
 STRICT RULES:
-- Generate answers using ONLY the information present in the context.
-- Do NOT use external knowledge, assumptions, or prior training data.
-- If the answer is not explicitly available, respond with: "The requested information is not available on the provided website."
-- Do NOT hallucinate.
-- Clear, professional, and concise.
-- Structured when appropriate (bullet points, steps, headings).
-- Human-like and ChatGPT-style responses.
-- Cite the website section contextually (e.g., "According to the website...").`;
+1. GROUNDING: Answer ONLY based on the provided context. If the information is not in the context, say: "The requested information is not available in the provided document."
+2. ZERO HALLUCINATION: Do not use external knowledge or make up details.
+3. FORMATTING: Use ONLY CLEAN MARKDOWN (headings, bullet points, bold).
+4. NO HTML: DO NOT output any HTML tags (like <h2>, <ul>, etc.).
+5. NO HORIZONTAL RULES: Do not use triple stars (***) or lines (---).
+6. CITATIONS: If multiple sources exist in context, cite them naturally.`;
 
       const result = await model.generateContent(
         `${personaPrompt}
@@ -210,7 +210,7 @@ STRICT RULES:
 export async function speechToText(audioBase64: string): Promise<string> {
   log("Transcribing audio using Gemini 1.5 Flash...");
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
     const result = await model.generateContent([
       {

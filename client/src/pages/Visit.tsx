@@ -19,9 +19,11 @@ import {
   User,
   Mic,
   Square,
-  Globe
+  Globe,
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 import type { ChatResponse } from "@shared/schema";
 import { clsx } from "clsx";
 import { useToast } from "@/hooks/use-toast";
@@ -287,7 +289,8 @@ export default function Visit() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col p-6 gap-2">
+        {/* Hiding Extracted Knowledge summary as requested by user to keep UI clean */}
+        {/* <div className="flex-1 overflow-hidden flex flex-col p-6 gap-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-2">
             {docType === 'web' ? <Globe className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
             <span>Extracted Knowledge</span>
@@ -303,6 +306,17 @@ export default function Visit() {
               </div>
             </div>
           </ScrollArea>
+        </div> */}
+        <div className="flex-1 flex items-center justify-center p-6 text-center">
+          <div className="max-w-[200px] space-y-2">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-6 h-6 text-primary" />
+            </div>
+            <h3 className="text-sm font-semibold">AI Assistant Ready</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              I've processed the {docType === 'web' ? 'web page' : 'PDF'} content. Ask me anything to get started!
+            </p>
+          </div>
         </div>
       </aside>
 
@@ -349,7 +363,11 @@ export default function Visit() {
                           : "bg-white dark:bg-slate-800 border border-border rounded-tl-sm"
                       )}
                     >
-                      {msg.content}
+                      <div className="prose prose-sm dark:prose-invert max-w-none text-inherit">
+                        <ReactMarkdown>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
 
                   </div>

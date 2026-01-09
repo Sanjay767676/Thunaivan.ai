@@ -12,7 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState("");
-  const [mode, setMode] = useState<"pdf" | "url">("pdf");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [mode, setMode] = useState<"pdf" | "url" | "search">("pdf");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -104,16 +106,17 @@ export default function Home() {
     }
   };
 
-  const handleUrlAnalyze = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!url.trim()) return;
+  const handleUrlAnalyze = async (e?: React.FormEvent, targetUrl?: string) => {
+    if (e) e.preventDefault();
+    const finalUrl = targetUrl || url;
+    if (!finalUrl.trim()) return;
 
     setIsUploading(true);
     try {
       const response = await fetch('/api/analyze-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: finalUrl }),
       });
 
       if (!response.ok) {
@@ -127,6 +130,36 @@ export default function Home() {
       toast({
         title: "Analysis failed",
         description: error.message || "Failed to analyze URL. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleWebSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setIsUploading(true);
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: searchQuery }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Search failed');
+      }
+
+      const data = await response.json();
+      setSearchResults(data.results);
+    } catch (error: any) {
+      toast({
+        title: "Search failed",
+        description: error.message || "Failed to search web. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -220,14 +253,18 @@ export default function Home() {
             </div>
 
             <Tabs defaultValue="pdf" className="w-full max-w-md mx-auto lg:mx-0" onValueChange={(v) => setMode(v as any)}>
-              <TabsList className="grid w-full grid-cols-2 mb-4 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+              <TabsList className="grid w-full grid-cols-3 mb-4 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                 <TabsTrigger value="pdf" className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm">
                   <FileText className="w-4 h-4 mr-2" />
-                  PDF Upload
+                  PDF
                 </TabsTrigger>
                 <TabsTrigger value="url" className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm">
                   <Globe className="w-4 h-4 mr-2" />
-                  Web URL
+                  Link
+                </TabsTrigger>
+                <TabsTrigger value="search" className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Search
                 </TabsTrigger>
               </TabsList>
 
@@ -366,6 +403,75 @@ export default function Home() {
                     )}
                   </Button>
                 </motion.form>
+              </TabsContent>
+
+              <TabsContent value="search">
+                <motion.div
+                  className="space-y-4"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <form onSubmit={handleWebSearch} className="flex gap-2">
+                    <div className="relative flex-1 group">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <Input
+                        placeholder="Search for government schemes..."
+                        className="pl-10 h-12 rounded-xl border-2 border-slate-200 dark:border-slate-700 focus:border-primary/50 transition-all bg-white dark:bg-slate-800"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <Button type="submit" disabled={isUploading || !searchQuery.trim()} className="rounded-xl h-12 shadow-lg shadow-primary/20">
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </form>
+
+                  <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+                    {searchResults.map((result, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:border-primary/30 transition-all group"
+                      >
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="flex-1">
+                            <h3 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-1">{result.title}</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">{result.snippet}</p>
+                            <span className="text-[10px] text-primary/70 mt-1 block truncate">{result.link}</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2 text-xs hover:bg-primary hover:text-white transition-all shrink-0"
+                            onClick={() => handleUrlAnalyze(undefined, result.link)}
+                            disabled={isUploading}
+                          >
+                            Analyze
+                          </Button>
+                        </div>
+                      </motion.div>
+                    ))}
+                    {searchResults.length === 0 && !isUploading && (
+                      <div className="text-center py-8 text-slate-400 text-sm italic">
+                        No search results yet.
+                      </div>
+                    )}
+                    {isUploading && searchResults.length === 0 && (
+                      <div className="text-center py-8">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"
+                        />
+                        <p className="text-sm text-slate-500 mt-2">Searching...</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
               </TabsContent>
             </Tabs>
 

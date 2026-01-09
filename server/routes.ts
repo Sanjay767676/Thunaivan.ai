@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { pdfMetadata, conversations, messages, insertPdfMetadataSchema, insertMessageSchema } from "@shared/schema";
 import { extractPdfText, multiModelAnalyze, getCombinedAnswer, speechToText } from "./lib/ai-multi";
-import { scrapeUrl, analyzeWebContent } from "./lib/web-analysis";
+import { scrapeUrl, analyzeWebContent, searchWeb } from "./lib/web-analysis";
 import { processPdfForRag, queryPdfRag } from "./lib/pdf-rag";
 import { eq } from "drizzle-orm";
 import { log } from "./index";
@@ -150,6 +150,22 @@ export async function registerRoutes(
     } catch (error: any) {
       log(`Error analyzing URL: ${error.message}`);
       res.status(400).json({ message: error.message || "Failed to analyze URL" });
+    }
+  });
+
+  app.post("/api/search", async (req: Request, res: Response) => {
+    try {
+      const { query } = req.body;
+      if (!query) {
+        return res.status(400).json({ message: "Query is required" });
+      }
+
+      log(`Searching web for: ${query}`);
+      const results = await searchWeb(query);
+      res.json({ results });
+    } catch (error: any) {
+      log(`Error searching: ${error.message}`);
+      res.status(500).json({ message: error.message || "Failed to search web" });
     }
   });
 
@@ -313,3 +329,4 @@ export async function registerRoutes(
 
   return httpServer;
 }
+ 

@@ -29,13 +29,16 @@ export async function scrapeUrl(url: string): Promise<string> {
 }
 
 export async function searchWeb(query: string): Promise<string> {
-    const apiKey = process.env.SERPAPI_API_KEY;
+    const apiKey = process.env.SEARCH_API_KEY || process.env.SERPAPI_API_KEY;
     if (!apiKey) {
-        throw new Error("SERPAPI_API_KEY is not configured.");
+        throw new Error("No Search API key configured. Please set SEARCH_API_KEY or SERPAPI_API_KEY in .env");
     }
 
+    const isSearchApiIo = process.env.SEARCH_API_KEY ? true : false;
+    const url = isSearchApiIo ? "https://www.searchapi.io/api/v1/search" : "https://serpapi.com/search";
+
     try {
-        const response = await axios.get("https://serpapi.com/search", {
+        const response = await axios.get(url, {
             params: {
                 q: query,
                 api_key: apiKey,
@@ -44,19 +47,21 @@ export async function searchWeb(query: string): Promise<string> {
         });
 
         const results = response.data.organic_results || [];
-        const snippets = results.map((res: any) => `${res.title}\n${res.link}\n${res.snippet}`).join("\n\n---\n\n");
-
-        return snippets;
+        return results.map((res: any) => ({
+            title: res.title,
+            link: res.link,
+            snippet: res.snippet
+        }));
     } catch (error: any) {
-        throw new Error(`SerpAPI search failed: ${error.message}`);
+        throw new Error(`Web search failed: ${error.message}`);
     }
 }
 
 export async function analyzeWebContent(text: string): Promise<string> {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
         const summaryPrompt = `You are a professional AI web content analyst.
-Analyze the provided web content and provide a comprehensive, structured summary.
+Analyze the provided web content and provide a comprehensive, structured summary in CLEAN MARKDOWN.
 Focus on:
 1. Main Purpose
 2. Key Benefits (Monetary & Non-monetary)
@@ -64,7 +69,12 @@ Focus on:
 4. Step-by-Step Application Process
 5. Contact Information & Important Links (if available)
 
-Use a professional, clear, and human-like tone. Use bullet points and headings for readability.
+STRICT RULES:
+- Use ONLY professional Markdown (headings, lists, bold).
+- DO NOT USE ANY HTML TAGS.
+- DO NOT USE HORIZONTAL RULES (*** or ---).
+- If any section info is missing, state it is not provided.
+- Maintain a clear, human-like, and professional tone.
 
 Content:
 ${text.substring(0, 30000)}`;
