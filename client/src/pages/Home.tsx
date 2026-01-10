@@ -30,7 +30,7 @@ export default function Home() {
   const handleFileSelect = (selectedFile: File) => {
     if (selectedFile.type !== "application/pdf") {
       toast({
-        title: "Invalid file type",
+        title: "Invalid-file type",
         description: "Please upload a PDF file",
         variant: "destructive"
       });
