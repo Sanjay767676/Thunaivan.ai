@@ -4,9 +4,10 @@ import { createRequire } from 'module';
 import axios from "axios";
 import { generateWithOllama, chatWithOllama, isOllamaAvailable } from "./ollama.js";
 
+import { log } from "../utils.js";
+
 const require = createRequire(import.meta.url);
-const pdfParseModule = require('pdf-parse');
-const pdf = pdfParseModule.PDFParse;
+const pdf = require('pdf-parse');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const openrouter = new OpenAI({
@@ -19,20 +20,11 @@ const grok = new OpenAI({
 });
 export const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-function log(message: string) {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-  console.log(`${formattedTime} [ai-multi] ${message}`);
-}
+// Local log removed, using ../utils.js
 
 export async function extractPdfText(url: string): Promise<string> {
   const response = await axios.get(url, { responseType: 'arraybuffer' });
-  const pdfParser = new pdf({ data: response.data });
-  const data = await pdfParser.getText();
+  const data = await pdf(response.data);
 
   const cleanText = data.text
     .split('\n')

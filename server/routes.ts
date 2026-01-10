@@ -12,8 +12,7 @@ import { eq } from "drizzle-orm";
 import { log } from "./utils.js";
 
 const require = createRequire(import.meta.url);
-const pdfParseModule = require('pdf-parse');
-const pdf = pdfParseModule.PDFParse;
+const pdf = require('pdf-parse');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -45,12 +44,7 @@ export async function registerRoutes(
       const fileSizeMB = (fileBuffer.length / 1024 / 1024).toFixed(2);
       log(`Extracting text from PDF: ${filename} (${fileSizeMB} MB)`);
 
-      if (!pdf) {
-        throw new Error(`PDFParse not found. Available: ${Object.keys(pdfParseModule).join(', ')}`);
-      }
-
-      const pdfParser = new pdf({ data: fileBuffer });
-      const pdfData = await pdfParser.getText();
+      const pdfData = await pdf(fileBuffer);
       const extractedText = pdfData.text;
 
       if (!extractedText || extractedText.trim().length === 0) {
