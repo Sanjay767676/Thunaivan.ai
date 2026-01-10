@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequire } from 'module';
 import axios from "axios";
-import { generateWithOllama, chatWithOllama, isOllamaAvailable } from "./ollama";
+import { generateWithOllama, chatWithOllama, isOllamaAvailable } from "./ollama.js";
 
 const require = createRequire(import.meta.url);
 const pdfParseModule = require('pdf-parse');

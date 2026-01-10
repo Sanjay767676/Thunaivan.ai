@@ -1,6 +1,6 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { genAI } from "./ai-multi";
+import { genAI } from "./ai-multi.js";
 
 export async function scrapeUrl(url: string): Promise<string> {
     try {

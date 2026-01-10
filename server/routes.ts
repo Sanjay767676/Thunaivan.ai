@@ -2,14 +2,14 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { createRequire } from 'module';
-import { storage } from "./storage";
-import { db } from "./db";
-import { pdfMetadata, conversations, messages, insertPdfMetadataSchema, insertMessageSchema } from "@shared/schema";
-import { extractPdfText, multiModelAnalyze, getCombinedAnswer, speechToText } from "./lib/ai-multi";
-import { scrapeUrl, analyzeWebContent, searchWeb } from "./lib/web-analysis";
-import { processPdfForRag, queryPdfRag } from "./lib/pdf-rag";
+import { storage } from "./storage.js";
+import { db } from "./db.js";
+import { pdfMetadata, conversations, messages, insertPdfMetadataSchema, insertMessageSchema } from "../shared/schema.js";
+import { extractPdfText, multiModelAnalyze, getCombinedAnswer, speechToText } from "./lib/ai-multi.js";
+import { scrapeUrl, analyzeWebContent, searchWeb } from "./lib/web-analysis.js";
+import { processPdfForRag, queryPdfRag } from "./lib/pdf-rag.js";
 import { eq } from "drizzle-orm";
-import { log } from "./index";
+import { log } from "./log.js";
 
 const require = createRequire(import.meta.url);
 const pdfParseModule = require('pdf-parse');
@@ -329,4 +329,4 @@ export async function registerRoutes(
 
   return httpServer;
 }
- 
+

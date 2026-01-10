@@ -1,6 +1,6 @@
 import { pipeline } from '@xenova/transformers';
-import { db } from "../db";
-import { pdfMetadata, documentChunks } from "@shared/schema";
+import { db } from "../db.js";
+import { pdfMetadata, documentChunks } from "../../shared/schema.js";
 import { eq } from "drizzle-orm";
 
 let extractor: any = null;

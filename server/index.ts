@@ -1,7 +1,8 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
+import { registerRoutes } from "./routes.js";
+import { serveStatic } from "./static.js";
+import { log } from "./log.js";
 import { createServer } from "http";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -55,16 +56,7 @@ const pdfRateLimiter = rateLimit({
 
 export { aiRateLimiter, pdfRateLimiter };
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
+// Log function moved to ./log.ts
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -106,7 +98,7 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
-    const { setupVite } = await import("./vite");
+    const { setupVite } = await import("./vite.js");
     await setupVite(httpServer, app);
   }
 
