@@ -14,6 +14,7 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "phi3:mini";
 
 export async function isOllamaAvailable(): Promise<boolean> {
+  if (process.env.VERCEL) return false;
   try {
     const response = await axios.get(`${OLLAMA_BASE_URL}/api/tags`, {
       timeout: 2000,

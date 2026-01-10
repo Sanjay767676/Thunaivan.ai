@@ -83,17 +83,19 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  const port = parseInt(process.env.PORT || "5000", 10);
-  const host = process.env.HOST || "127.0.0.1";
+  if (!process.env.VERCEL) {
+    const port = parseInt(process.env.PORT || "5000", 10);
+    const host = process.env.HOST || "127.0.0.1";
 
-  const listenOptions: any = { port, host };
-  if (process.platform !== "win32") {
-    listenOptions.reusePort = true;
+    const listenOptions: any = { port, host };
+    if (process.platform !== "win32") {
+      listenOptions.reusePort = true;
+    }
+
+    httpServer.listen(listenOptions, () => {
+      log(`serving on ${host}:${port}`);
+    });
   }
-
-  httpServer.listen(listenOptions, () => {
-    log(`serving on ${host}:${port}`);
-  });
 })();
 
 export default app;
