@@ -2,11 +2,10 @@ import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes.js";
 import { serveStatic } from "./static.js";
-import { log } from "./log.js";
+import { log, aiRateLimiter, pdfRateLimiter } from "./utils.js";
 import { createServer } from "http";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import rateLimit from "express-rate-limit";
 
 const app = express();
 const httpServer = createServer(app);
@@ -38,25 +37,7 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-const aiRateLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 10,
-  message: "Too many requests, please try again later.",
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const pdfRateLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  max: 5,
-  message: "Too many PDF uploads, please wait a few minutes.",
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-export { aiRateLimiter, pdfRateLimiter };
-
-// Log function moved to ./log.ts
+// Rate limiters and log moved to ./utils.ts
 
 app.use((req, res, next) => {
   const start = Date.now();

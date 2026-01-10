@@ -9,7 +9,7 @@ import { extractPdfText, multiModelAnalyze, getCombinedAnswer, speechToText } fr
 import { scrapeUrl, analyzeWebContent, searchWeb } from "./lib/web-analysis.js";
 import { processPdfForRag, queryPdfRag } from "./lib/pdf-rag.js";
 import { eq } from "drizzle-orm";
-import { log } from "./log.js";
+import { log } from "./utils.js";
 
 const require = createRequire(import.meta.url);
 const pdfParseModule = require('pdf-parse');
@@ -27,7 +27,7 @@ const upload = multer({
   }
 });
 
-import { aiRateLimiter, pdfRateLimiter } from "./index";
+import { aiRateLimiter, pdfRateLimiter } from "./utils.js";
 
 export async function registerRoutes(
   httpServer: Server,
