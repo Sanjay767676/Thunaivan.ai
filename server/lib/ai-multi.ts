@@ -7,7 +7,7 @@ import { generateWithOllama, chatWithOllama, isOllamaAvailable } from "./ollama.
 import { log } from "../utils.js";
 
 const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
+const pdf = require('pdf-parse-fork');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const openrouter = new OpenAI({

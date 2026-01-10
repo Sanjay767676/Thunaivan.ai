@@ -12,7 +12,7 @@ import { eq } from "drizzle-orm";
 import { log } from "./utils.js";
 
 const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
+const pdf = require('pdf-parse-fork');
 
 const upload = multer({
   storage: multer.memoryStorage(),
