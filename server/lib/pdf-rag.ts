@@ -3,13 +3,22 @@ import { db } from "../db.js";
 import { pdfMetadata, documentChunks } from "../../shared/schema.js";
 import { eq } from "drizzle-orm";
 
+import { genAI } from "./ai-multi.js";
+
 let extractor: any = null;
 
 async function getExtractor() {
+  if (process.env.VERCEL) {
+    return {
+      type: 'gemini',
+      model: genAI.getGenerativeModel({ model: "text-embedding-004" })
+    };
+  }
+
   if (!extractor) {
     extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
   }
-  return extractor;
+  return { type: 'local', pipe: extractor };
 }
 
 function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200): {
@@ -74,18 +83,29 @@ export async function processPdfForRag(docId: number, text: string): Promise<voi
     const { chunks, metadata } = chunkText(cleanText, 1000, 200);
     log(`[doc-rag] Created ${chunks.length} chunks from document ${docId}`);
 
-    const pipe = await getExtractor();
+    const config = await getExtractor();
+    const batchSize = config.type === 'gemini' ? 50 : 10; // Gemini supports larger batches
 
-    const batchSize = 10;
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batch = chunks.slice(i, i + batchSize);
-      const batchEmbeddings = await Promise.all(
-        batch.map(chunk =>
-          pipe(chunk, { pooling: 'mean', normalize: true }).then((output: any) =>
-            Array.from(output.data)
+      let batchEmbeddings: number[][];
+
+      if (config.type === 'gemini') {
+        const result = await config.model.batchEmbedContents({
+          requests: batch.map(t => ({
+            content: { role: 'user', parts: [{ text: t }] }
+          }))
+        });
+        batchEmbeddings = result.embeddings.map(e => e.values);
+      } else {
+        batchEmbeddings = await Promise.all(
+          batch.map(chunk =>
+            config.pipe(chunk, { pooling: 'mean', normalize: true }).then((output: any) =>
+              Array.from(output.data) as number[]
+            )
           )
-        )
-      );
+        );
+      }
 
       const inserts = batch.map((chunk, j) => ({
         docId,
@@ -131,9 +151,16 @@ export async function queryPdfRag(
       throw new Error(`Document ${docId} not found or not analyzed.`);
     }
 
-    const pipe = await getExtractor();
-    const output = await pipe(question, { pooling: 'mean', normalize: true });
-    const questionEmbedding = Array.from(output.data) as number[];
+    const config = await getExtractor();
+    let questionEmbedding: number[];
+
+    if (config.type === 'gemini') {
+      const result = await config.model.embedContent(question);
+      questionEmbedding = result.embedding.values;
+    } else {
+      const output = await config.pipe(question, { pooling: 'mean', normalize: true });
+      questionEmbedding = Array.from(output.data) as number[];
+    }
 
     const scoredChunks = allChunks.map(chunk => {
       const chunkEmbedding = chunk.embedding as number[];
